@@ -1,0 +1,35 @@
+service: arquifusion-intelligence
+frameworkVersion: '4'
+package: {individually: true}
+provider:
+  name: aws
+  runtime: nodejs24.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role: ${env:AWS_LAMBDA_ROLE_ARN}
+  httpApi:
+    id: ${env:HTTP_API_ID}
+    authorizers:
+      cognito:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${env:COGNITO_ISSUER}
+        audience: ['${env:COGNITO_AUDIENCE}']
+  environment:
+    STORAGE_MODE: cloud
+    AUTH_MODE: cognito
+    MACHINES_TABLE: ${env:MACHINES_TABLE}
+    TENANTS_TABLE: ${env:TENANTS_TABLE}
+    COGNITO_ISSUER: ${env:COGNITO_ISSUER}
+    COGNITO_AUDIENCE: ${env:COGNITO_AUDIENCE}
+    WEB_ORIGIN: ${env:WEB_ORIGIN}
+functions:
+  intelligence:
+    handler: dist/api/domains/intelligence.intelligence
+    role: ${env:INTELLIGENCE_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /intelligence/recommendations, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+  agents:
+    handler: dist/api/domains/intelligence.agents
+    role: ${env:INTELLIGENCE_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /agents, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]

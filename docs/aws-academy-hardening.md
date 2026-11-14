@@ -1,138 +1,133 @@
-# Hardening local y preparación de AWS Academy
+﻿# Hardening local y preparación de AWS Academy
 
-Este documento describe el estado comprobable de la rama `feature/aws-academy-hardening`. El alcance de esta fase es local: no se desplegaron recursos, no se consultaron cuentas y no se usaron credenciales cloud. GCP queda fuera del alcance.
+## Alcance y estado
 
-## Estado y límites de servicio
+Esta fase modifica únicamente el repositorio local. No se usaron credenciales, no se consultó AWS/GCP y no hubo despliegues. La rama de trabajo al inicio fue `feature/aws-academy-hardening`; permanece sin commits ni cambios de rama.
 
-| Unidad | Entrada / contrato | Persistencia | Construcción y prueba independiente | Despliegue independiente |
+Estado actual: el backend continúa siendo un workspace TypeScript común y comparte contratos/adaptadores compilados, pero ahora dispone de cinco configuraciones Serverless y puntos de entrada Lambda por dominio. Esto permite stacks de despliegue independientes, no procesos de desarrollo independientes ni bases de datos aisladas. La separación real en AWS depende de desplegar primero la plataforma y pasar a cada stack valores concretos de recursos compartidos.
+
+## Topología y propiedad de recursos
+
+```mermaid
+flowchart LR
+  Web[Frontend] --> API[HTTP API compartida]
+  Platform[Stack platform<br/>health y tenants] --> API
+  Fleet[Stack fleet<br/>máquinas / métricas] --> API
+  Ingestion[Stack ingestion<br/>CSV / JSON] --> API
+  Intelligence[Stack intelligence<br/>LangGraph determinista] --> API
+  Supervisor[Stack supervisor<br/>tareas / workflow] --> API
+  Platform --> Tenants[(Tenants DynamoDB)]
+  Platform --> Machines[(Machines DynamoDB)]
+  Platform --> Tasks[(Tasks DynamoDB)]
+  Platform --> S3[(Uploads S3)]
+  Fleet --> Machines
+  Fleet --> Tenants
+  Ingestion --> Machines
+  Ingestion --> Tenants
+  Ingestion --> S3
+  Intelligence --> Machines
+  Intelligence --> Tenants
+  Supervisor --> Tasks
+  Supervisor --> Machines
+  Supervisor --> Tenants
+  Supervisor --> SFN[Step Functions Standard]
+  SFN --> Worker[Supervisor worker Lambda]
+```
+
+`backend/serverless.yml` es el stack fundacional `arquifusion-platform`: es propietario de HTTP API, funciones health/tenants, tabla legacy, tabla activa de máquinas, tabla tenants/memberships, tabla tasks y bucket de originales. `backend/serverless.fleet.yml`, `serverless.ingestion.yml`, `serverless.intelligence.yml` y `serverless.supervisor.yml` poseen exclusivamente sus funciones/rutas; Supervisor también posee la state machine. Los stacks de dominio adjuntan rutas a la API existente con `HTTP_API_ID`; no crean otra API ni copian las tablas/bucket.
+
+La distribución de datos se configura por variables (`MACHINES_TABLE`, `TENANTS_TABLE`, `TASKS_TABLE`, `UPLOADS_BUCKET`, `TASK_STATE_MACHINE_ARN`) y el identificador de HTTP API. Los outputs del stack fundacional publican nombres/ID; no se usan imports CloudFormation entre stacks, para permitir su empaquetado y ciclo de vida independiente. Es responsabilidad del operador pasar valores del mismo stage/región/cuenta. No se debe borrar `platform` mientras haya stacks de dominio: eliminar primero los dominios. Actualizar o quitar un stack de dominio no requiere actualizar los otros, aunque eliminar rutas requiere confirmar que ese stack es el propietario de las rutas correspondientes.
+
+Empaquetado previsto desde `backend/`:
+
+```powershell
+npx serverless package --config serverless.yml --stage <stage> --region <region>
+npx serverless package --config serverless.fleet.yml --stage <stage> --region <region>
+npx serverless package --config serverless.ingestion.yml --stage <stage> --region <region>
+npx serverless package --config serverless.intelligence.yml --stage <stage> --region <region>
+npx serverless package --config serverless.supervisor.yml --stage <stage> --region <region>
+```
+
+El primer despliegue futuro sería `platform`, seguido por cada dominio. Cada servicio se puede actualizar o eliminar con su propio `--config`. Las variables de recursos compartidos deben mantenerse iguales por stage. El stack fundacional es una dependencia operativa, no una pila monolítica que deba actualizarse para cada cambio de Fleet.
+
+`createApiHandlers` continúa siendo la composición del servidor local completo. Las entradas Lambda en `backend/src/api/domains/` componen solo las dependencias de su dominio y las configuraciones restringen qué variables cloud son obligatorias. El código fuente/paquete npm sigue siendo compartido: la independencia lograda es de stack y entrypoint, no de repositorio, workspace o despliegue de artefactos versionados.
+
+## Servicios y dependencias
+
+| Dominio | Entrada y rutas | Dependencias runtime | Recursos que consume | Stack independiente |
 |---|---|---|---|---|
-| API operativa TypeScript | `backend/src/api/handlers.ts`, HTTP API/Lambda | Adaptadores local o AWS elegidos por configuración | Workspace `backend`, `npm run build -w backend` y suite backend | Una pila Serverless. Cada función obtiene artefacto individual (`package.individually`), pero no hay stacks separados por dominio |
-| Fleet | Handler HTTP + contratos Machine | Repositorio compartido local/DynamoDB | No es un servicio: prueba dentro del workspace backend | No; comparte autorización, API y almacenamiento |
-| Ingestion | CSV/JSON, normalizador común, `OriginalFileStore` | Máquinas + original local/S3 | No es un servicio: prueba dentro del workspace backend | No; comparte API, contratos y persistencia |
-| Metrics | Lectura agregada tenant-scoped | Repositorio Fleet | No es un servicio: prueba dentro del workspace backend | No; separado daría poco valor y requeriría coordinación de lecturas |
-| Intelligence | Contrato `IntelligenceProvider`, LangGraph determinista | No guarda estado propio | Prueba backend; independiente del transporte en código | No; ejecutado dentro de Lambda por ahora |
-| Supervisor | API, worker y contrato de eventos | JSON local o tabla DynamoDB + Step Functions en cloud | Pruebas backend | Worker y dispatcher son Lambdas propias, misma pila Serverless |
-| Notifications | Adaptador Gmail pendiente de OAuth | Ninguna | Tests backend de estado no configurado | No es un servicio ni existe ruta de notificación |
-| Servicio Python | HTTP `/health` y contrato de eventos | Ninguna | `npm run build:python`, `npm run test:python`; propio `pyproject.toml` | Empaquetable como contenedor local; no integrado ni declarado en AWS |
-| Frontend | React/Vite + cliente API y PKCE | `sessionStorage` para sesión cloud; estado operacional lo provee API | Workspace frontend, build y pruebas propias | No se incluye despliegue frontend en la pila backend |
+| Platform | `api/domains/platform.ts`; health y tenants | core config, tenancy, storage | tenants; es propietario de API/tablas/bucket compartidos | Sí; base obligatoria |
+| Fleet | `api/domains/fleet.ts`; máquinas y métricas | core, fleet, metrics, storage, tenancy | machines + tenants | Sí |
+| Ingestion | `api/domains/ingestion.ts`; CSV/JSON | ingestion, storage, tenancy | machines + tenants + bucket | Sí |
+| Intelligence | `api/domains/intelligence.ts`; recomendaciones y agentes | LangGraph determinista, fleet/storage, tenancy | machines + tenants | Sí; no hay modelo externo |
+| Supervisor | `api/domains/supervisor.ts`; tareas, eventos, worker | supervisor + workflow de inteligencia + storage | tasks + machines + tenants + Step Functions | Sí; estado de workflow propio |
+| Metrics | Integrado en Fleet | consultas completas del repositorio Fleet | machines | No requiere stack propio hoy |
+| Notifications | Gmail adapter no configurado | OAuth pendiente | Ninguno | No es servicio desplegable |
 
-La solución operativa es un backend modular en un solo servicio y una sola pila. No conviene fragmentar Fleet, Ingestion, Metrics e Intelligence en servicios de red mientras comparten almacenamiento, autorización y modelo de despliegue. `api/handlers.ts` quedó como raíz de composición; las adaptaciones HTTP están en `backend/src/api/handlers/*.ts`. Serverless genera un artefacto por función, pero la selección de un servicio/domino para desplegarlo por separado no está implementada ni se ha validado con `serverless package`.
+Los handlers no llaman las funciones HTTP de otro dominio. Los dominios se conectan por contratos y recursos compartidos, no por importaciones de implementaciones cruzadas. Cada stack apunta a un módulo JavaScript compilado bajo `dist/api/domains/`; el validador comprueba que ese artefacto exista y que tenga fuente TypeScript. El storage package contiene fábricas reutilizables, aunque importa adaptadores del workspace; no se ha dividido en paquetes npm separados. Local conserva su servidor único y configuración explícita sin requerir credenciales.
 
-## Entorno local explícito
+## IAM y AWS Academy LabRole
 
-```powershell
-npm ci
-npm test
-npm run build
-npm run infra:validate
-npm run dev:api
-npm run dev:web
-```
+No se crean roles ni políticas IAM. Cada YAML permite una ARN de rol preexistente en `provider.iam.role` y overrides `functions.<name>.role`. `AWS_LAMBDA_ROLE_ARN` es el modo compatible con Academy/LabRole; las variables opcionales por función permiten separación si el laboratorio ya ofrece esos roles. Esta configuración no crea los roles override. `AWS_STEP_FUNCTIONS_ROLE_ARN` es una identidad distinta preexistente para Step Functions.
 
-Node.js 24 y npm 10 son la línea declarada en `package.json`. Python 3 es necesario para pruebas/compilación de `services/intelligence`. Para probar backend sin iniciar el resto: `npm test -w backend`; frontend: `npm test -w frontend`; servicio Python: `npm run test:python`.
+| Funciones | Acceso runtime mínimo que necesita el código | Override opcional |
+|---|---|---|
+| health | Logs CloudWatch | `HEALTH_ROLE_ARN` |
+| tenants read/write | Logs; lectura/query/transacciones de tenants; escritura solo en create | `TENANT_READ_ROLE_ARN`, `TENANT_WRITE_ROLE_ARN` |
+| Fleet read | Logs; lectura/query de machines y membresías | `FLEET_READ_ROLE_ARN` |
+| Ingestion | Logs; escritura condicional/upsert de machines, lectura necesaria para autorizaciones; `s3:PutObject` solo al prefijo de imports | `INGESTION_WRITE_ROLE_ARN` |
+| Intelligence | Logs; lectura de machines y tenants | `INTELLIGENCE_READ_ROLE_ARN` |
+| Supervisor submit | Logs; acceso requerido a tasks/idempotency/events, lectura de máquinas; `states:StartExecution` sobre su state machine | `SUPERVISOR_SUBMIT_ROLE_ARN` |
+| Supervisor queries/overview | Logs; lectura/query tasks/events y máquinas cuando aplique | `SUPERVISOR_READ_ROLE_ARN`, `SUPERVISOR_OVERVIEW_ROLE_ARN` |
+| Supervisor worker/dead letter | Logs; lectura/escritura condicional y transaccional tasks/events; lectura de machines | `SUPERVISOR_WORKER_ROLE_ARN` |
+| State machine | `lambda:InvokeFunction` únicamente sobre `runTask` y `markTaskDeadLetter` | `AWS_STEP_FUNCTIONS_ROLE_ARN` |
 
-El modo local usa identidad fija `local-dev-user`, `local-demo`, archivos bajo `backend/data`, y un dispatcher en memoria/cola local. No usa Cognito ni AWS. El modo cloud falla al iniciar si no hay tablas, bucket, state machine, Cognito issuer/client ID u origen HTTPS. No existe fallback cloud→local. No pongas valores cloud en el entorno de pruebas locales.
+La matriz expresa acciones derivadas del código, no una política IAM generada ni comprobada. En modo rol compartido, LabRole debe satisfacer la unión de estos permisos y cualquier permiso de logging/API Gateway exigido por la plataforma. Separar el ARN en YAML reduce permisos efectivos solo si cada ARN apunta a un rol ya existente con una política realmente limitada. Revisar LabRole y sus permisos en AWS Academy posteriormente; esta fase no accedió a la cuenta. Separar identidad de despliegue y roles de ejecución: el actor que ejecuta Serverless también necesita permisos de despliegue/lectura de estado/CloudFormation, y no es el rol de Lambda.
 
-## Autenticación, membresía y autorización
+Las variables se listan vacías en `.env.example`; no rellenar con credenciales reales. Variables principales: `AWS_LAMBDA_ROLE_ARN`, `AWS_STEP_FUNCTIONS_ROLE_ARN`, roles opcionales por función, `AWS_ACCOUNT_ID`, `AWS_REGION`, `HTTP_API_ID`, `MACHINES_TABLE`, `LEGACY_MACHINES_TABLE`, `TENANTS_TABLE`, `TASKS_TABLE`, `UPLOADS_BUCKET`, `TASK_STATE_MACHINE_ARN`, `COGNITO_ISSUER`, `COGNITO_AUDIENCE`, `WEB_ORIGIN`.
 
-En cloud, API Gateway HTTP API valida JWT, issuer, client/audience y scopes de ruta. La Lambda vuelve a verificar la firma RS256 contra el JWKS derivado del issuer, `token_use=access`, `client_id`, `sub`, scope y vencimiento con `aws-jwt-verify`; nunca toma el `sub` de un claim decodificado sin verificar. El autorizador revalida la membresía seleccionada en la tabla base con lectura consistente, exige tenant activo, rol requerido y scope. `X-Tenant-Id` solo selecciona una membresía ya autorizada. El ID de tenant enviado dentro del registro importado no establece el propietario.
+## Concurrencia de tareas
 
-La creación de organización exige usuario autenticado, scope `arquifusion/write`, clave `Idempotency-Key`, nombre limitado, transacción condicional en DynamoDB y un candado por usuario para permitir una sola organización self-service. El primer usuario obtiene `owner`. No hay invitaciones, administración de miembros ni transferencia de propiedad. La firma, issuer, audiencia, expiración y `token_use` se prueban con claves RSA/JWKS locales generadas durante el test; ningún token real se usa.
+`TaskRecord.version` inicia en 1. Lecturas de registros históricos sin ese campo los interpretan como versión 1; la primera actualización condicional los migra al formato versionado. Cada transición válida incrementa versión. `task-state.ts` limita transiciones, mantiene inmutables tenant/task/execution/idempotency, y rechaza transiciones inválidas con `TaskConflictError`.
 
-El frontend implementa Authorization Code + PKCE, `state`, renovación, revocación del refresh token y limpieza de sesión. Estas pruebas cubren la lógica cliente, no un Hosted UI real. Antes de producción hay que probar alta, confirmación, callback, scopes, refresh rotado, revocación/logout y rechazo con un User Pool configurado.
+En DynamoDB, `DynamoTaskStore` lee consistentemente y usa `TransactWriteItems`: actualiza la fila de tarea condicionando versión anterior, estado anterior y claim cuando corresponde, y crea el evento con una clave determinista y condición de inexistencia en la misma transacción. Una versión obsoleta falla como conflicto (no se informa éxito). Una repetición exacta de una transición ya confirmada devuelve el estado actual y no añade evento duplicado. Esto ofrece atomicidad entre registro y evento en DynamoDB, sujeto a las garantías/errores de servicio real que aún deben validarse.
 
-## Aislamiento y persistencia
+Un claim condicional mueve QUEUED/RETRYING a RUNNING, registra worker/execution y lease de 315 s (el timeout de worker es 300 s); solo un worker obtiene el claim. El mismo worker/execution reintentado con lease activo es idempotente. Claim activo de otro worker genera conflicto; claims expirados se pueden recuperar y esa adquisición incrementa versión/attempts y registra evento. El claim se verifica en actualizaciones del worker.
 
-- Fleet DynamoDB usa `pk=<tenantId>` y `sk=<machineId>`. Los cursores comprueban el tenant de la clave.
-- Membresías usan una tabla compartida con `ByUser`; el índice solo enumera. La autorización relee base y metadatos con `ConsistentRead`.
-- Tareas, marcadores de idempotencia y eventos comparten tabla con partición `pk=<tenantId>`; create es transaccional y consultas no usan `Scan`.
-- Archivos S3 usan `tenants/<tenantId>/imports/<sha256>.<extension>`, SSE-S3, bloqueo de acceso público, `BucketOwnerEnforced` y denegación de transporte sin TLS.
-- Los tests adversariales usan Tenant A y B, roles operador/viewer, usuario sin membresía y un verifier de tokens de prueba. Comprueban lectura, ID manipulado, tenant header, escritura de ingestión, métricas, tareas/eventos, rutas de modificación inexistentes, archivo y contexto de workflow interno.
-- El test local no reemplaza condiciones DynamoDB reales ni política S3. No se ejecutó LocalStack ni se consultó AWS.
+El store local serializa operaciones en proceso y escribe archivo local; prueba las reglas, pero no garantiza coordinación de varios procesos. El adaptador de prueba Dynamo modela las condiciones/transacciones y no sustituye DynamoDB Local ni una cuenta real. La recuperación de claims abandonados es oportunista cuando vuelve a invocarse el worker: no hay sweeper/redrive automático del claim. Los fallos terminales se guardan como `DEAD_LETTER` en la tabla, no como SQS DLQ. Step Functions conserva el retry/catch del workflow, pero sus garantías de entrega y ejecución no se simulan totalmente en local.
 
-En local, JSON y cola asíncrona solo soportan un proceso; la escritura de archivos es atómica, pero no existe coordinación entre procesos. En cloud, DynamoDB conserva tenants, tareas, eventos e idempotencia; las tablas nuevas declaran PITR y `Retain`. Los originales conservan S3. No existe migración automática de la tabla antigua de máquinas.
+## Validación ejecutada y límite de Serverless
 
-## Supervisor y recuperación
+Verificado localmente en esta revisión:
 
-Al enviar una tarea, el Supervisor valida `fleet.recommendations`, crea task/execution/correlation IDs, registra solicitud y marcador de idempotencia, asigna la única capacidad existente y despacha `StartExecution` con contexto de tenant completo y nombre estable de ejecución. El worker revalida coincidencia de tenant, tarea, ejecución y correlación contra el registro persistido; al volver, exige estado `SUCCEEDED`. Step Functions Standard limita el task a 330 s, permite dos reintentos de errores transitorios de integración, persiste fallo y termina con `Fail`.
+- `npm test -w backend`: 50/50 pruebas aprobadas, incluye verificación JWT local, aislamiento adversarial A/B y pruebas de claims/versiones/eventos para stores local y Dynamo simulado.
+- `npm run infra:validate`: compila backend y pasa comprobaciones estructurales de cinco YAML Serverless, 17 funciones, 15 rutas únicas, propiedad de recursos, referencias de roles, JWT, almacenamiento retenido y workflow Standard.
+- Las configuraciones se parsearon con Serverless Framework 4.46.0 (`--version`) sin credenciales.
+- `serverless package` para las cinco configuraciones se intentó con variables ficticias no persistidas y sin credenciales. Framework v4 se detuvo en su requisito de sesión/licencia antes de empaquetar: “You must sign in or use a License Key”. No se inició sesión ni se configuró licencia, no se produjeron artefactos y no se validó el esquema/resolución AWS completo. No se ejecutó `serverless deploy`.
+- La validación estática propia NO equivale a `cfn-lint`, SAM ni validación oficial de CloudFormation. La integración real en API Gateway existente, nombres lógicos/output, permisos y aceptación del LabRole quedan pendientes.
 
-`DEAD_LETTER` es un estado terminal de la tarea, no una SQS DLQ. El workflow estándar retiene historial por un período limitado y admite redrive de ejecuciones fallidas dentro de la ventana de AWS; esto no sustituye la retención del registro de negocio. No añadimos SQS porque ahora hay un único workflow, sin fan-out, buffer de presión o consumidores competidores. Si aparecen esos requisitos, considerar SQS/DLQ y definir redrive/duplicados explícitos.
+Los stacks de dominio comparten el código backend, por tanto el criterio de compilar el workspace se cumple pero el empaquetado Serverless independiente todavía no quedó demostrado por el bloqueo de licencia local. No se debe presentar como paquete probado hasta ejecutar los comandos anteriores en un entorno con Framework v4 habilitado y sin despliegue.
 
-Step Functions Standard ofrece semántica de ejecución de workflow, pero no hace transaccionales efectos laterales de Lambda. El proveedor actual es una lectura/recomendación determinista; efectos futuros deben ser idempotentes. Un error de red ambiguo en `StartExecution` todavía puede dejar una ejecución iniciada cuyo acuse no llegó; la API informa fallo de dispatch, así que el operador debe inspeccionar task y ejecución antes de volver a solicitarla. La simulación local no reproduce el historial, concurrencia, retries, límites ni redrive de AWS.
+## Procedimiento AWS Academy posterior (no ejecutar en esta fase)
 
-`DynamoTaskStore.update` comprueba que el registro exista, pero no usa un número de versión ni una condición de transición sobre el estado anterior. Una invocación duplicada/concurrente del worker podría volver a ejecutar el proveedor y añadir eventos repetidos o sobrescribir el estado más reciente. Hoy el proveedor solo lee datos y calcula recomendaciones, por lo que no repite efectos operativos. Antes de añadir acciones con efectos, debe agregarse control optimista de versión/claim condicional de tarea y una prueba de concurrencia contra el adaptador correspondiente.
+1. Confirmar en Academy región/cuotas y permisos para API Gateway, Lambda, DynamoDB, S3, Step Functions y Cognito; revisar ARN y permisos efectivos de LabRole. Comprobar también permisos de despliegue del usuario del laboratorio.
+2. Preparar variables no secretas por stage, con nombres únicos de tabla/bucket y API; configurar issuer/audience y origen permitido. Seleccionar overrides únicamente para roles preexistentes autorizados.
+3. Con Serverless Framework v4 licenciado, ejecutar `serverless package --config ...` para los cinco manifests, inspeccionar artifacts/templates y verificar API existente/rutas, recursos e IAM generados antes de cualquier despliegue.
+4. Desplegar y verificar primero `platform`; registrar outputs `HttpApiId`, nombres de tablas y bucket. A continuación empaquetar/desplegar cada dominio pasando esos outputs como configuración y el mismo stage/región.
+5. Para retirar una parte, eliminar primero stacks de dominio que dependan de platform; validar el efecto de Retain en datos antes de operar. No eliminar foundation mientras conserve datos compartidos.
+6. Probar Cognito, rutas autorizadas, tenants A/B, importación y originales, condiciones concurrentes DynamoDB, workflow/retries y costes en una cuenta de prueba.
 
-## Observabilidad
-
-La API emite JSON con request ID, correlation ID, operación, tenant autorizado, status, duración y tipo de error. Nunca registra JWT ni cuerpos de importación. En local cada solicitud recibe UUID nuevo; el correlation ID entrante solo se acepta con caracteres limitados. Hay logs de seguridad separados para rechazos 401/403. Eventos de negocio se persisten como eventos de tarea; no existe una auditoría general de cambios ni exportación/retención de logs cloud declarada.
-
-## Infraestructura declarada
-
-`backend/serverless.yml` declara una pila AWS: HTTP API, funciones Lambda Node.js 24 por ruta y workers, tablas DynamoDB on-demand, bucket S3 privado, state machine Standard y autorización JWT. El template separado `backend/infrastructure/cognito.yml` declara User Pool, scopes y cliente Hosted UI público PKCE con refresh-token rotation, revocación y protección de borrado. Esto es IaC; no prueba disponibilidad de servicio o permiso en AWS Academy.
-
-El validador local `npm run infra:validate` analiza sintaxis YAML y realiza aserciones estructurales propias. No es CloudFormation Guard, `cfn-lint`, `sam validate` ni validación de AWS. En este entorno no estaban disponibles `cfn-lint`, SAM CLI ni AWS CLI al revisar PATH. `serverless package/deploy` no se ejecutó: el empaquetado de este proyecto puede resolver parámetros/estado remoto y requerir credenciales; tampoco se desea iniciar sesión en cloud en esta fase.
-
-### Roles preexistentes que deben estar disponibles
-
-La plantilla no crea roles. `AWS_LAMBDA_ROLE_ARN` debe ser un rol preexistente confiado por `lambda.amazonaws.com`, y `AWS_STEP_FUNCTIONS_ROLE_ARN` uno confiado por `states.amazonaws.com`. Antes de desplegar, revisar ARN y permisos efectivos en el laboratorio. Como mínimo, el rol Lambda requiere:
-
-- `logs:CreateLogGroup`, `logs:CreateLogStream`, `logs:PutLogEvents` solo en grupos de este stack.
-- `dynamodb:GetItem`, `PutItem`, `Query`, `TransactWriteItems` solo en tablas tenant/machines/tasks de este stack y el índice `ByUser`.
-- `s3:PutObject` solo en `arn:aws:s3:::<bucket>/tenants/*/imports/*`.
-- `states:StartExecution` solo en la máquina `fleet-recommendations` de este stack.
-
-El rol Step Functions necesita `lambda:InvokeFunction` limitado a las Lambdas `runTask` y `markTaskDeadLetter`. Si se añade logging de Step Functions, especificar y limitar sus permisos de CloudWatch Logs. Serverless crea permisos de invocación API Gateway para sus propias funciones; no se debe conceder `iam:*` ni permisos administrativos a estos roles. AWS Academy puede imponer nombres de rol, permisos de despliegue, límites de servicios o región; esto debe comprobarse con el administrador del laboratorio, no con un intento de despliegue.
-
-### Variables para una futura preparación cloud
-
-```text
-AWS_ACCOUNT_ID
-AWS_REGION (opción CLI; predeterminado us-east-1)
-AWS_LAMBDA_ROLE_ARN
-AWS_STEP_FUNCTIONS_ROLE_ARN
-COGNITO_ISSUER
-COGNITO_AUDIENCE
-WEB_ORIGIN (origen HTTPS exacto para API cloud)
-```
-
-El nombre de tabla, bucket y state machine se deriva en `serverless.yml` a partir de servicio, stage y `AWS_ACCOUNT_ID`. No se comparten archivos `.env` ni credenciales. Para cognito.yml se deben decidir `DomainPrefix`, `CallbackUrl` y `LogoutUrl` antes del despliegue, asegurando que las URLs correspondan al cliente realmente publicado.
-
-## Procedimiento de primer despliegue — no ejecutado
-
-Solo después de aprobación operativa y confirmación de cuotas/permisos del laboratorio:
-
-1. Preparar una región, stage único, dominio Hosted UI, URLs HTTPS del frontend y los dos roles existentes; revisar permisos mínimos.
-2. Desplegar Cognito primero desde `backend/infrastructure/cognito.yml` con un stack dedicado, `DomainPrefix` único y callback/logout exactos. Recoger los outputs `IssuerUrl`, `WebClientId`, `HostedUiUrl` sin publicarlos.
-3. Con los valores del User Pool, preparar variables cloud sin guardar secretos en Git.
-4. Desde `backend/`, empaquetar y revisar la plantilla/resultados antes de solicitar el despliegue.
-5. Tras aprobación explícita, desplegar la pila `arquifusion-intelligence` con `npx serverless deploy --stage <stage> --region <region>`.
-6. Validar health, login, scopes, A/B adversarial, importación, archivo, tarea, fallo/redrive y costes en una cuenta de pruebas.
-
-Comando previsto de Cognito (no ejecutado):
+Ejemplos futuros (requieren revisión/aprobación operativa y no se han ejecutado):
 
 ```powershell
-aws cloudformation deploy --template-file backend/infrastructure/cognito.yml --stack-name arquifusion-cognito-<stage> --parameter-overrides DomainPrefix=<prefijo-unico> CallbackUrl=<url-callback> LogoutUrl=<url-salida>
+Set-Location C:\Users\anton\Desktop\HackCloud\backend
+npx serverless deploy --config serverless.yml --stage <stage> --region <region>
+npx serverless deploy --config serverless.fleet.yml --stage <stage> --region <region>
+npx serverless deploy --config serverless.ingestion.yml --stage <stage> --region <region>
+npx serverless deploy --config serverless.intelligence.yml --stage <stage> --region <region>
+npx serverless deploy --config serverless.supervisor.yml --stage <stage> --region <region>
 ```
 
-Comando previsto de API (no ejecutado):
+Para actualizar un dominio se repite solamente su comando `deploy --config ...`; para retirarlo, `npx serverless remove --config serverless.<dominio>.yml --stage <stage> --region <region>`. No quitar `platform` hasta retirar todos los dominios; las tablas y el bucket de foundation declaran `Retain` para conservar datos.
 
-```powershell
-Set-Location backend
-npx serverless deploy --stage <stage> --region <region>
-```
-
-El template de Cognito no crea roles IAM; `CAPABILITY_IAM` puede no ser necesario para esta plantilla y debe omitirse si la revisión del template confirma que no crea recursos IAM. La plantilla API usa roles existentes. Antes del primer despliegue, validar templates con una herramienta CloudFormation oficial disponible y revisar todos los cambios y reemplazos. `serverless package` y `serverless deploy` pueden requerir acceso AWS; no están cubiertos por pruebas locales.
-
-## Validación disponible y pendiente
-
-Comandos locales ejecutados en esta rama:
-
-```powershell
-npm test
-npm run build
-npm run infra:validate
-npm audit
-git diff --check
-```
-
-La suite normal no requiere AWS. JWT local, integración HTTP local, A/B y sesiones frontend son verificables sin nube. Pendiente de validar con entorno real controlado: Hosted UI Cognito, resolución de permisos LabRole, empaquetado Serverless con parámetros reales, validación oficial CloudFormation, semántica real de StartExecution/redrive, acceso DynamoDB/S3 y observabilidad CloudWatch. No hay componentes GCP integrados en esta fase.
+No se recomienda ejecutar hasta completar la inspección de outputs/configuración y permisos indicada arriba. GCP permanece fuera de alcance.

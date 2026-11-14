@@ -46,11 +46,11 @@ export function createSupervisorHandlers(supervisor: AgentSupervisor, machines: 
         recentEvents: eventList.slice(-20).reverse(), domains: { inventory: "planned", technicianAssignment: "planned", incidents: "planned" },
       };
     }),
-    runTask: async (input: unknown) => {
+    runTask: async (input: unknown, workerId = `worker-${Date.now()}`) => {
       const payload = requireWorkflowContext(input);
       const existing = await tasks.get(payload.tenantId, payload.taskId);
       if (!matchesWorkflow(existing, payload)) throw new Error("Workflow context does not match a persisted task");
-      await supervisor.executeTask(payload.tenantId, payload.taskId);
+      await supervisor.executeTask(payload.tenantId, payload.taskId, workerId);
       const final = await tasks.get(payload.tenantId, payload.taskId);
       if (!matchesWorkflow(final, payload) || final?.state !== "SUCCEEDED") throw new Error("Task did not complete successfully");
       return final;

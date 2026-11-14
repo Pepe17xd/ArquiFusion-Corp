@@ -1,0 +1,98 @@
+service: arquifusion-supervisor
+frameworkVersion: '4'
+package: {individually: true}
+provider:
+  name: aws
+  runtime: nodejs24.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role: ${env:AWS_LAMBDA_ROLE_ARN}
+  httpApi:
+    id: ${env:HTTP_API_ID}
+    authorizers:
+      cognito:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${env:COGNITO_ISSUER}
+        audience: ['${env:COGNITO_AUDIENCE}']
+  environment:
+    STORAGE_MODE: cloud
+    AUTH_MODE: cognito
+    MACHINES_TABLE: ${env:MACHINES_TABLE}
+    TENANTS_TABLE: ${env:TENANTS_TABLE}
+    TASKS_TABLE: ${env:TASKS_TABLE}
+    TASK_STATE_MACHINE_ARN: arn:aws:states:${aws:region}:${env:AWS_ACCOUNT_ID}:stateMachine:arquifusion-supervisor-${sls:stage}-fleet-recommendations
+    COGNITO_ISSUER: ${env:COGNITO_ISSUER}
+    COGNITO_AUDIENCE: ${env:COGNITO_AUDIENCE}
+    WEB_ORIGIN: ${env:WEB_ORIGIN}
+functions:
+  submitTask:
+    handler: dist/api/domains/supervisor.submitTask
+    role: ${env:SUPERVISOR_SUBMIT_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /tasks, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}}]
+  tasks:
+    handler: dist/api/domains/supervisor.tasks
+    role: ${env:SUPERVISOR_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /tasks, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+  getTask:
+    handler: dist/api/domains/supervisor.getTask
+    role: ${env:SUPERVISOR_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: '/tasks/{taskId}', method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+  taskEvents:
+    handler: dist/api/domains/supervisor.taskEvents
+    role: ${env:SUPERVISOR_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /events, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+  operationsOverview:
+    handler: dist/api/domains/supervisor.operationsOverview
+    role: ${env:SUPERVISOR_OVERVIEW_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /operations/overview, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+  runTask:
+    handler: dist/api/domains/supervisor.runTask
+    role: ${env:SUPERVISOR_WORKER_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    timeout: 300
+  markTaskDeadLetter:
+    handler: dist/api/domains/supervisor.markTaskDeadLetter
+    role: ${env:SUPERVISOR_WORKER_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    timeout: 30
+resources:
+  Resources:
+    FleetRecommendationsStateMachine:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        StateMachineName: arquifusion-supervisor-${sls:stage}-fleet-recommendations
+        StateMachineType: STANDARD
+        RoleArn: ${env:AWS_STEP_FUNCTIONS_ROLE_ARN}
+        Definition:
+          StartAt: EjecutarWorkflow
+          States:
+            EjecutarWorkflow:
+              Type: Task
+              TimeoutSeconds: 330
+              Resource: {Fn::GetAtt: [RunTaskLambdaFunction, Arn]}
+              Retry:
+                - ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException]
+                  IntervalSeconds: 2
+                  MaxAttempts: 2
+                  BackoffRate: 2
+              Catch:
+                - ErrorEquals: [States.ALL]
+                  ResultPath: $.workflowError
+                  Next: RegistrarFalloDurable
+              End: true
+            RegistrarFalloDurable:
+              Type: Task
+              Resource: {Fn::GetAtt: [MarkTaskDeadLetterLambdaFunction, Arn]}
+              Retry:
+                - ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException]
+                  IntervalSeconds: 2
+                  MaxAttempts: 2
+                  BackoffRate: 2
+              Next: EjecucionFallida
+            EjecucionFallida:
+              Type: Fail
+              Error: FleetWorkflowFailed
+              Cause: The fleet workflow did not complete successfully.
+  Outputs:
+    FleetRecommendationsStateMachineArn:
+      Value: {Ref: FleetRecommendationsStateMachine}
