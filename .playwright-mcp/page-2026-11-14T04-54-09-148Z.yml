@@ -1,0 +1,113 @@
+- generic [ref=f4e3]:
+  - complementary [ref=f4e5]:
+    - generic [ref=f4e6]: ARQUIFUSION
+    - generic [ref=f4e20]:
+      - generic [ref=f4e24]:
+        - generic [ref=f4e25]: WORKSPACE
+        - generic [ref=f4e26]: Operations
+      - generic [ref=f4e27]: ⌄
+    - generic [ref=f4e28]: OPERATIONS
+    - navigation "Navegación principal" [ref=f4e29]:
+      - button "Command center" [ref=f4e30] [cursor=pointer]
+      - button "Fleet 2" [ref=f4e288] [cursor=pointer]:
+        - generic [ref=f4e43]: Fleet
+        - generic [ref=f4e44]: "2"
+      - button "AI agent command" [ref=f4e45] [cursor=pointer]
+      - button "System activity" [ref=f4e50] [cursor=pointer]
+      - button "Data ingestion" [ref=f4e54] [cursor=pointer]
+    - generic [ref=f4e59]: PLANNED MODULES
+    - navigation "Módulos planificados" [ref=f4e60]:
+      - button "Maintenance PREP" [ref=f4e61] [cursor=pointer]:
+        - generic [ref=f4e64]: Maintenance
+        - generic [ref=f4e65]: PREP
+      - button "Inventory PREP" [ref=f4e66] [cursor=pointer]:
+        - generic [ref=f4e73]: Inventory
+        - generic [ref=f4e74]: PREP
+      - button "Technicians PREP" [ref=f4e75] [cursor=pointer]:
+        - generic [ref=f4e81]: Technicians
+        - generic [ref=f4e82]: PREP
+      - button "Incident center PREP" [ref=f4e83] [cursor=pointer]:
+        - generic [ref=f4e87]: Incident center
+        - generic [ref=f4e88]: PREP
+    - generic [ref=f4e89]:
+      - generic [ref=f4e95]:
+        - generic [ref=f4e96]: CORE SYSTEM
+        - generic [ref=f4e97]: Operational layer
+      - generic [ref=f4e99]: API conectada
+      - generic [ref=f4e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f4e105]: "2.0"
+  - generic [ref=f4e106]:
+    - banner [ref=f4e107]:
+      - generic [ref=f4e108]:
+        - generic [ref=f4e109]: ARQUIFUSION
+        - generic [ref=f4e112]: AI agent command
+      - generic [ref=f4e113]:
+        - generic [ref=f4e114]:
+          - time [ref=f4e118]: 23:54:08
+          - generic [ref=f4e119]: 13 nov. 2026
+        - generic [ref=f4e120]: API conectada
+        - button "Actualizar datos" [ref=f4e122] [cursor=pointer]
+        - generic "Interfaz local del workspace" [ref=f4e129]: LOCAL
+    - main [ref=f4e131]:
+      - status [ref=f4e606]:
+        - generic [ref=f4e608]: "2 registros procesados: 2 aceptados y 0 rechazados. Original: local://imports/3ca5a31aaa1e771a54b028d40693a76415115ba3592073bb652400ebe6dc5edc.json"
+        - button "Cerrar aviso" [ref=f4e609] [cursor=pointer]
+      - generic [ref=f4e132]:
+        - generic [ref=f4e133]:
+          - generic [ref=f4e134]: ARQUIFUSION / OPERATIONS
+          - heading "AI agent command" [level=1] [ref=f4e631]
+          - paragraph [ref=f4e136]: Implemented intelligence capability and the roles planned for the platform.
+        - generic [ref=f4e615]: LIVE API DATA
+      - generic [ref=f4e632]:
+        - generic [ref=f4e633]:
+          - generic [ref=f4e634]:
+            - generic [ref=f4e635]:
+              - generic [ref=f4e636]: AI AGENT COMMAND
+              - heading "Agent roster" [level=2] [ref=f4e637]
+            - generic [ref=f4e638]: 1 / 6 OPERATIVE
+          - generic [ref=f4e639]:
+            - button "Predictive Maintenance Agent Fleet risk assessment Operativo" [ref=f4e640] [cursor=pointer]:
+              - generic [ref=f4e645]:
+                - generic [ref=f4e646]: Predictive Maintenance Agent
+                - generic [ref=f4e647]: Fleet risk assessment
+              - generic [ref=f4e648]: Operativo
+            - button "Coordinator Agent Workflow coordination Planificado" [active] [ref=f4e649] [cursor=pointer]:
+              - generic [ref=f4e654]:
+                - generic [ref=f4e655]: Coordinator Agent
+                - generic [ref=f4e656]: Workflow coordination
+              - generic [ref=f4e657]: Planificado
+            - button "Fleet Operations Agent Utilization and dispatch Planificado" [ref=f4e658] [cursor=pointer]:
+              - generic [ref=f4e663]:
+                - generic [ref=f4e664]: Fleet Operations Agent
+                - generic [ref=f4e665]: Utilization and dispatch
+              - generic [ref=f4e666]: Planificado
+            - button "Inventory Intelligence Agent Parts readiness Planificado" [ref=f4e667] [cursor=pointer]:
+              - generic [ref=f4e672]:
+                - generic [ref=f4e673]: Inventory Intelligence Agent
+                - generic [ref=f4e674]: Parts readiness
+              - generic [ref=f4e675]: Planificado
+            - button "Technician Assignment Agent Skills and workload Planificado" [ref=f4e676] [cursor=pointer]:
+              - generic [ref=f4e681]:
+                - generic [ref=f4e682]: Technician Assignment Agent
+                - generic [ref=f4e683]: Skills and workload
+              - generic [ref=f4e684]: Planificado
+            - button "Incident Intelligence Agent Incident triage Planificado" [ref=f4e685] [cursor=pointer]:
+              - generic [ref=f4e690]:
+                - generic [ref=f4e691]: Incident Intelligence Agent
+                - generic [ref=f4e692]: Incident triage
+              - generic [ref=f4e693]: Planificado
+        - generic [ref=f4e694]:
+          - generic [ref=f4e695]: AGENT PROFILE / 02
+          - generic [ref=f4e696]:
+            - generic [ref=f4e701]:
+              - heading "Coordinator Agent" [level=2] [ref=f4e743]
+              - paragraph [ref=f4e703]: Workflow coordination
+            - generic [ref=f4e704]: Planificado
+          - paragraph [ref=f4e705]: Cross-workflow coordination has no backend implementation yet.
+          - generic [ref=f4e744]:
+            - generic [ref=f4e748]: Planned capability
+            - generic [ref=f4e749]: No service endpoint, execution, input or result history exists for this role.
+      - generic [ref=f4e284]:
+        - generic [ref=f4e285]: ARQUIFUSION OPERATIONS INTELLIGENCE
+        - generic [ref=f4e287]: LOCAL DEVELOPMENT · API CONNECTED

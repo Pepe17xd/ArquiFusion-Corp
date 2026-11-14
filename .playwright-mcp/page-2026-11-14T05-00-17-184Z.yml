@@ -1,0 +1,141 @@
+- generic [ref=f7e3]:
+  - complementary [ref=f7e5]:
+    - generic [ref=f7e6]: ARQUIFUSION
+    - generic [ref=f7e20]:
+      - generic [ref=f7e24]:
+        - generic [ref=f7e25]: WORKSPACE
+        - generic [ref=f7e26]: Operations
+      - generic [ref=f7e27]: ⌄
+    - generic [ref=f7e28]: OPERATIONS
+    - navigation "Navegación principal" [ref=f7e29]:
+      - button "Command center" [ref=f7e30] [cursor=pointer]
+      - button "Fleet 0" [ref=f7e37] [cursor=pointer]:
+        - generic [ref=f7e43]: Fleet
+        - generic [ref=f7e44]: "0"
+      - button "AI agent command" [ref=f7e45] [cursor=pointer]
+      - button "System activity" [ref=f7e50] [cursor=pointer]
+      - button "Data ingestion" [ref=f7e54] [cursor=pointer]
+    - generic [ref=f7e59]: PLANNED MODULES
+    - navigation "Módulos planificados" [ref=f7e60]:
+      - button "Maintenance PREP" [ref=f7e61] [cursor=pointer]:
+        - generic [ref=f7e64]: Maintenance
+        - generic [ref=f7e65]: PREP
+      - button "Inventory PREP" [ref=f7e66] [cursor=pointer]:
+        - generic [ref=f7e73]: Inventory
+        - generic [ref=f7e74]: PREP
+      - button "Technicians PREP" [ref=f7e75] [cursor=pointer]:
+        - generic [ref=f7e81]: Technicians
+        - generic [ref=f7e82]: PREP
+      - button "Incident center PREP" [ref=f7e83] [cursor=pointer]:
+        - generic [ref=f7e87]: Incident center
+        - generic [ref=f7e88]: PREP
+    - generic [ref=f7e89]:
+      - generic [ref=f7e95]:
+        - generic [ref=f7e96]: CORE SYSTEM
+        - generic [ref=f7e97]: Operational layer
+      - generic [ref=f7e99]: Comprobando API
+      - generic [ref=f7e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f7e105]: "2.0"
+  - generic [ref=f7e106]:
+    - banner [ref=f7e107]:
+      - button "Abrir navegación" [ref=f7e108] [cursor=pointer]
+      - generic [ref=f7e110]: ARQUIFUSION
+      - generic [ref=f7e125]:
+        - generic [ref=f7e126]: Comprobando API
+        - button "Actualizar datos" [ref=f7e128] [cursor=pointer]
+    - main [ref=f7e134]:
+      - generic [ref=f7e135]:
+        - generic [ref=f7e136]:
+          - generic [ref=f7e137]: ARQUIFUSION / OPERATIONS
+          - heading "Operational overview" [level=1] [ref=f7e138]
+          - paragraph [ref=f7e139]: Fleet conditions, live signals and intelligence in one operational view.
+        - generic [ref=f7e140]: CHECKING API
+      - region "Fleet status metrics" [ref=f7e142]:
+        - article [ref=f7e143]:
+          - generic [ref=f7e144]: "01"
+          - generic [ref=f7e148]: Fleet assets
+          - generic [ref=f7e151]: All registered machines
+        - article [ref=f7e152]:
+          - generic [ref=f7e153]: "02"
+          - generic [ref=f7e157]: Operational
+          - generic [ref=f7e160]: Current reported status
+        - article [ref=f7e161]:
+          - generic [ref=f7e162]: "03"
+          - generic [ref=f7e166]: Maintenance
+          - generic [ref=f7e169]: Current reported status
+        - article [ref=f7e170]:
+          - generic [ref=f7e171]: "04"
+          - generic [ref=f7e175]: Attention required
+          - generic [ref=f7e178]: Alerts and stopped
+      - generic [ref=f7e179]:
+        - generic [ref=f7e180]:
+          - generic [ref=f7e181]:
+            - generic [ref=f7e182]:
+              - generic [ref=f7e183]: LANGGRAPH / WORKFLOW 01
+              - heading "Intelligence core" [level=2] [ref=f7e184]
+              - paragraph [ref=f7e185]: Fleet risk analysis · deterministic rules
+            - button "Abrir AI Agent Command" [ref=f7e186] [cursor=pointer]
+          - 'img "Flujo real: registros de flota pasan por assessFleet y producen recomendaciones estructuradas" [ref=f7e190]':
+            - generic [ref=f7e193]:
+              - generic [ref=f7e199]: INPUT
+              - generic [ref=f7e200]: Fleet records
+              - generic [ref=f7e201]: Current state + readings
+            - generic [ref=f7e202]:
+              - generic [ref=f7e207]: LANGGRAPH NODE
+              - generic [ref=f7e208]: assessFleet
+              - generic [ref=f7e209]: Rule evaluation
+            - generic [ref=f7e210]:
+              - generic [ref=f7e215]: STRUCTURED OUTPUT
+              - generic [ref=f7e216]: Recommendations
+              - generic [ref=f7e217]: Evidence-backed
+            - generic [ref=f7e218]:
+              - generic [ref=f7e219]: status
+              - generic [ref=f7e221]: temperature
+              - generic [ref=f7e223]: vibration
+          - generic [ref=f7e225]:
+            - generic [ref=f7e230]:
+              - generic [ref=f7e231]: LAST EXECUTION
+              - generic [ref=f7e232]: Evaluating live fleet…
+            - button "Running" [disabled] [ref=f7e233]
+        - generic [ref=f7e234]:
+          - generic [ref=f7e235]:
+            - generic [ref=f7e236]:
+              - generic [ref=f7e237]: OPERATIONAL INSIGHTS
+              - heading "Evidence-backed findings" [level=2] [ref=f7e238]
+            - button "Workflow" [ref=f7e239] [cursor=pointer]
+          - generic [ref=f7e242]:
+            - generic [ref=f7e245]: Waiting for intelligence result
+            - generic [ref=f7e246]: Rules inspect reported status, temperature and vibration. No findings are added without supporting data.
+          - generic [ref=f7e247]: SOURCE · deterministic-rules
+      - generic [ref=f7e248]:
+        - generic [ref=f7e249]:
+          - generic [ref=f7e250]:
+            - generic [ref=f7e251]: API TELEMETRY / CURRENT READINGS
+            - heading "Signal overview" [level=2] [ref=f7e252]
+            - paragraph [ref=f7e253]: Average of loaded records · no historical series available
+          - generic [ref=f7e254]: 0 / 0 loaded
+        - generic [ref=f7e266]:
+          - generic [ref=f7e267]: i
+          - text: Telemetry units are not defined in the source contract. Coverage shows records with a reported value, not sensor health.
+      - generic [ref=f7e268]:
+        - generic [ref=f7e269]:
+          - generic [ref=f7e270]:
+            - generic [ref=f7e271]: REGISTERED EQUIPMENT
+            - heading "Fleet at a glance" [level=2] [ref=f7e272]
+          - button "Open fleet" [ref=f7e273] [cursor=pointer]
+        - generic [ref=f7e276]:
+          - table [ref=f7e277]:
+            - rowgroup [ref=f7e278]:
+              - row [ref=f7e279]:
+                - columnheader "MACHINE" [ref=f7e280]
+                - columnheader "CATEGORY" [ref=f7e281]
+                - columnheader "LOCATION" [ref=f7e282]
+                - columnheader "STATUS" [ref=f7e283]
+                - columnheader "HOURS" [ref=f7e284]
+                - columnheader "UPDATED" [ref=f7e285]
+            - rowgroup
+          - generic [ref=f7e286]: Loading fleet records…
+      - generic [ref=f7e287]:
+        - generic [ref=f7e288]: ARQUIFUSION OPERATIONS INTELLIGENCE
+        - generic [ref=f7e290]: LOCAL DEVELOPMENT · CONNECTING

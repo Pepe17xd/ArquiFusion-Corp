@@ -1,0 +1,262 @@
+- generic [ref=f15e3]:
+  - complementary [ref=f15e5]:
+    - generic [ref=f15e6]: ARQUIFUSION
+    - generic [ref=f15e20]:
+      - generic [ref=f15e24]:
+        - generic [ref=f15e25]: ESPACIO DE TRABAJO
+        - generic [ref=f15e26]: Operaciones
+      - generic [ref=f15e27]: ⌄
+    - generic [ref=f15e28]: OPERACIONES
+    - navigation "Navegación principal" [ref=f15e29]:
+      - button "Centro de mando" [ref=f15e30] [cursor=pointer]
+      - button "Flota 2" [ref=f15e451] [cursor=pointer]:
+        - generic [ref=f15e43]: Flota
+        - generic [ref=f15e44]: "2"
+      - button "Centro de agentes" [ref=f15e45] [cursor=pointer]
+      - button "Actividad del sistema" [ref=f15e50] [cursor=pointer]
+      - button "Ingesta de datos" [ref=f15e54] [cursor=pointer]
+    - generic [ref=f15e59]: MÓDULOS PLANIFICADOS
+    - navigation "Módulos planificados" [ref=f15e60]:
+      - button "Mantenimiento PLAN" [ref=f15e61] [cursor=pointer]:
+        - generic [ref=f15e64]: Mantenimiento
+        - generic [ref=f15e65]: PLAN
+      - button "Inventario PLAN" [ref=f15e66] [cursor=pointer]:
+        - generic [ref=f15e73]: Inventario
+        - generic [ref=f15e74]: PLAN
+      - button "Técnicos PLAN" [ref=f15e75] [cursor=pointer]:
+        - generic [ref=f15e81]: Técnicos
+        - generic [ref=f15e82]: PLAN
+      - button "Incidentes PLAN" [ref=f15e83] [cursor=pointer]:
+        - generic [ref=f15e87]: Incidentes
+        - generic [ref=f15e88]: PLAN
+    - generic [ref=f15e89]:
+      - generic [ref=f15e95]:
+        - generic [ref=f15e96]: SISTEMA CENTRAL
+        - generic [ref=f15e97]: Capa operativa
+      - generic [ref=f15e99]: API conectada
+      - generic [ref=f15e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f15e105]: "2.0"
+  - generic [ref=f15e106]:
+    - banner [ref=f15e107]:
+      - button "Abrir navegación" [ref=f15e452] [cursor=pointer]
+      - generic [ref=f15e454]: ARQUIFUSION
+      - generic [ref=f15e113]:
+        - generic [ref=f15e120]: API conectada
+        - button "Actualizar datos" [ref=f15e122] [cursor=pointer]
+    - main [ref=f15e131]:
+      - generic [ref=f15e132]:
+        - generic [ref=f15e133]:
+          - generic [ref=f15e134]: ARQUIFUSION / OPERACIONES
+          - heading "Centro de mando" [level=1] [ref=f15e135]
+          - paragraph [ref=f15e136]: Estado de la flota, señales actuales e inteligencia operacional en una sola vista.
+        - generic [ref=f15e137]: DATOS DE API
+      - region "Indicadores de estado de la flota" [ref=f15e139]:
+        - article [ref=f15e140]:
+          - generic [ref=f15e141]: "01"
+          - generic [ref=f15e145]: Equipos registrados
+          - generic [ref=f15e146]: "2"
+          - generic [ref=f15e148]: Total de maquinaria
+        - article [ref=f15e149]:
+          - generic [ref=f15e150]: "02"
+          - generic [ref=f15e154]: Operativas
+          - generic [ref=f15e155]: "1"
+          - generic [ref=f15e157]: 50.0% de disponibilidad
+        - article [ref=f15e158]:
+          - generic [ref=f15e159]: "03"
+          - generic [ref=f15e163]: En mantenimiento
+          - generic [ref=f15e164]: "1"
+          - generic [ref=f15e166]: Estado informado
+        - article [ref=f15e167]:
+          - generic [ref=f15e168]: "04"
+          - generic [ref=f15e172]: Requieren atención
+          - generic [ref=f15e173]: "0"
+          - generic [ref=f15e175]: 0 alertas · 0 detenidas
+      - region "Un núcleo. Seis especialidades." [ref=f15e176]:
+        - generic [ref=f15e177]:
+          - generic [ref=f15e178]:
+            - generic [ref=f15e179]: ECOSISTEMA DE INTELIGENCIA
+            - heading "Un núcleo. Seis especialidades." [level=2] [ref=f15e180]
+            - paragraph [ref=f15e181]: El workflow operativo evalúa datos reales de la flota; los demás roles son capacidades planificadas.
+          - generic [ref=f15e182]: Arquitectura objetivo
+        - generic [ref=f15e184]:
+          - button "Coordinación Planificado" [ref=f15e469] [cursor=pointer]:
+            - generic [ref=f15e196]:
+              - generic [ref=f15e197]: Coordinación
+              - generic [ref=f15e198]: Planificado
+          - button "Mantenimiento predictivo Planificado" [ref=f15e470] [cursor=pointer]:
+            - generic [ref=f15e207]:
+              - generic [ref=f15e208]: Mantenimiento predictivo
+              - generic [ref=f15e209]: Planificado
+          - button "Operaciones de flota Planificado" [ref=f15e471] [cursor=pointer]:
+            - generic [ref=f15e218]:
+              - generic [ref=f15e219]: Operaciones de flota
+              - generic [ref=f15e220]: Planificado
+          - button "Inteligencia de inventario Planificado" [ref=f15e472] [cursor=pointer]:
+            - generic [ref=f15e230]:
+              - generic [ref=f15e231]: Inteligencia de inventario
+              - generic [ref=f15e232]: Planificado
+          - button "Asignación de técnicos Planificado" [ref=f15e473] [cursor=pointer]:
+            - generic [ref=f15e243]:
+              - generic [ref=f15e244]: Asignación de técnicos
+              - generic [ref=f15e245]: Planificado
+          - button "Inteligencia de incidentes Planificado" [active] [pressed] [ref=f15e474] [cursor=pointer]:
+            - generic [ref=f15e255]:
+              - generic [ref=f15e256]: Inteligencia de incidentes
+              - generic [ref=f15e257]: Planificado
+          - generic [ref=f15e260]:
+            - generic [ref=f15e261]:
+              - generic [ref=f15e262]: Evaluación completada
+              - generic [ref=f15e264]: LANGGRAPH
+            - img "Ilustración de un cerebro artificial formado por nodos y circuitos" [ref=f15e265]
+            - generic [ref=f15e306]:
+              - generic [ref=f15e307]:
+                - generic [ref=f15e308]: Evaluación determinista de flota
+                - generic [ref=f15e309]: Única capacidad de inteligencia operativa
+              - button "Ejecutar evaluación de flota" [ref=f15e310] [cursor=pointer]:
+                - generic [ref=f15e313]: Ejecutar
+        - generic [ref=f15e314]:
+          - generic [ref=f15e325]:
+            - generic [ref=f15e326]: ESPECIALIDAD · Incidentes
+            - generic [ref=f15e327]: Inteligencia de incidentes
+            - paragraph [ref=f15e328]: Analizará sucesos y sus relaciones operativas.
+          - generic [ref=f15e329]: PLANIFICADO
+        - generic [ref=f15e330]: Las conexiones representan la arquitectura objetivo; no indican ejecuciones. Solo el workflow determinista central está implementado.
+      - generic [ref=f15e335]:
+        - generic [ref=f15e336]:
+          - generic [ref=f15e337]:
+            - generic [ref=f15e338]:
+              - generic [ref=f15e339]: LANGGRAPH / WORKFLOW 01
+              - heading "Evaluación de flota" [level=2] [ref=f15e340]
+              - paragraph [ref=f15e341]: Análisis determinista del estado de la flota
+            - button "Abrir centro de agentes" [ref=f15e342] [cursor=pointer]
+          - 'img "Flujo real: registros de flota pasan por assessFleet y producen recomendaciones estructuradas" [ref=f15e346]':
+            - generic [ref=f15e349]:
+              - generic [ref=f15e355]: ENTRADA
+              - generic [ref=f15e356]: Registros de flota
+              - generic [ref=f15e357]: Estado y lecturas actuales
+            - generic [ref=f15e358]:
+              - generic [ref=f15e363]: NODO LANGGRAPH
+              - generic [ref=f15e364]: assessFleet
+              - generic [ref=f15e365]: Evaluación de reglas
+            - generic [ref=f15e366]:
+              - generic [ref=f15e371]: SALIDA ESTRUCTURADA
+              - generic [ref=f15e372]: Recomendaciones
+              - generic [ref=f15e373]: Con evidencia
+            - generic [ref=f15e374]:
+              - generic [ref=f15e375]: estado
+              - generic [ref=f15e377]: temperatura
+              - generic [ref=f15e379]: vibración
+          - generic [ref=f15e381]:
+            - generic [ref=f15e386]:
+              - generic [ref=f15e387]: ÚLTIMA EJECUCIÓN
+              - generic [ref=f15e388]: 14/11/2026, 12:15:24 a. m.
+            - button "Ejecutar evaluación" [ref=f15e480] [cursor=pointer]
+          - generic [ref=f15e481]:
+            - generic [ref=f15e482]: deterministic-rules
+            - generic [ref=f15e483]: 2 recomendaciones recibidas
+            - generic [ref=f15e484]: ·
+            - generic [ref=f15e485]: El historial de ejecuciones no se conserva
+        - generic [ref=f15e394]:
+          - generic [ref=f15e395]:
+            - generic [ref=f15e396]:
+              - generic [ref=f15e397]: HALLAZGOS OPERACIONALES
+              - heading "Hallazgos con evidencia" [level=2] [ref=f15e398]
+            - button "Workflow" [ref=f15e399] [cursor=pointer]
+          - generic [ref=f15e402]:
+            - article [ref=f15e486]:
+              - generic [ref=f15e490]:
+                - generic [ref=f15e491]:
+                  - generic [ref=f15e492]: HIGH
+                  - button "BLD-002" [ref=f15e493] [cursor=pointer]
+                - heading "Revisar temperatura elevada" [level=3] [ref=f15e494]
+                - paragraph [ref=f15e495]: La temperatura reportada es 92 °C.
+                - generic [ref=f15e496]: "temperature: 92"
+                - generic [ref=f15e498]: Inspeccionar refrigeración y validar el sensor; confirmar el umbral con las especificaciones del fabricante.
+            - article [ref=f15e499]:
+              - generic [ref=f15e503]:
+                - generic [ref=f15e504]:
+                  - generic [ref=f15e505]: MEDIUM
+                  - button "BLD-002" [ref=f15e506] [cursor=pointer]
+                - heading "Programar inspección de vibración" [level=3] [ref=f15e507]
+                - paragraph [ref=f15e508]: La vibración reportada es 5.1.
+                - generic [ref=f15e509]: "vibration: 5.1"
+                - generic [ref=f15e511]: Comparar con la línea base del modelo y revisar componentes rotativos en la próxima ventana de mantenimiento.
+          - generic [ref=f15e407]:
+            - text: ORIGEN · deterministic-rules
+            - generic [ref=f15e512]: · 12:15:24 a. m.
+      - generic [ref=f15e408]:
+        - generic [ref=f15e409]:
+          - generic [ref=f15e410]:
+            - generic [ref=f15e411]: TELEMETRÍA DE API / LECTURAS ACTUALES
+            - heading "Resumen de señales" [level=2] [ref=f15e412]
+            - paragraph [ref=f15e413]: Promedio de los registros cargados · no hay series históricas
+          - generic [ref=f15e414]: 2 / 2 cargadas
+        - generic [ref=f15e415]:
+          - 'article "Temperatura: promedio de 2 registros" [ref=f15e513]':
+            - generic [ref=f15e514]: 2/2
+            - generic [ref=f15e519]: 88.5UNIDAD DE ORIGEN
+            - generic [ref=f15e520]: Temperatura
+            - img "2 de 2 registros contienen Temperatura" [ref=f15e521]
+          - 'article "Vibración: promedio de 2 registros" [ref=f15e523]':
+            - generic [ref=f15e524]: 2/2
+            - generic [ref=f15e531]: 4.7UNIDAD DE ORIGEN
+            - generic [ref=f15e532]: Vibración
+            - img "2 de 2 registros contienen Vibración" [ref=f15e533]
+          - 'article "Presión: promedio de 2 registros" [ref=f15e535]':
+            - generic [ref=f15e536]: 2/2
+            - generic [ref=f15e542]: 195UNIDAD DE ORIGEN
+            - generic [ref=f15e543]: Presión
+            - img "2 de 2 registros contienen Presión" [ref=f15e544]
+          - 'article "Consumo de combustible: promedio de 2 registros" [ref=f15e546]':
+            - generic [ref=f15e547]: 2/2
+            - generic [ref=f15e553]: 21UNIDAD DE ORIGEN
+            - generic [ref=f15e554]: Consumo de combustible
+            - img "2 de 2 registros contienen Consumo de combustible" [ref=f15e555]
+          - 'article "Horas de operación: promedio de 2 registros" [ref=f15e557]':
+            - generic [ref=f15e558]: 2/2
+            - generic [ref=f15e563]: 2,325HORAS
+            - generic [ref=f15e564]: Horas de operación
+            - img "2 de 2 registros contienen Horas de operación" [ref=f15e565]
+        - generic [ref=f15e426]:
+          - generic [ref=f15e427]: i
+          - text: El contrato de origen no define unidades de telemetría. La cobertura indica registros con valor, no el estado del sensor.
+      - generic [ref=f15e428]:
+        - generic [ref=f15e429]:
+          - generic [ref=f15e430]:
+            - generic [ref=f15e431]: MAQUINARIA REGISTRADA
+            - heading "Vista rápida de la flota" [level=2] [ref=f15e432]
+          - button "Ver flota" [ref=f15e433] [cursor=pointer]
+        - table [ref=f15e437]:
+          - rowgroup [ref=f15e438]:
+            - row [ref=f15e439]:
+              - columnheader "MÁQUINA" [ref=f15e440]
+              - columnheader "CATEGORÍA" [ref=f15e441]
+              - columnheader "UBICACIÓN" [ref=f15e442]
+              - columnheader "ESTADO" [ref=f15e443]
+              - columnheader "HORAS" [ref=f15e444]
+              - columnheader "ACTUALIZACIÓN" [ref=f15e445]
+          - rowgroup [ref=f15e567]:
+            - row [ref=f15e568] [cursor=pointer]:
+              - cell "BLD-002 Bulldozer D9" [ref=f15e569]:
+                - generic [ref=f15e570]:
+                  - text: BLD-002
+                  - generic [ref=f15e571]: Bulldozer D9
+              - cell "Bulldozer" [ref=f15e572]
+              - cell "Zona B" [ref=f15e573]
+              - cell "Mantenimiento" [ref=f15e574]
+              - cell "3400" [ref=f15e578]
+              - cell "13/11/2026" [ref=f15e579]
+            - row [ref=f15e580] [cursor=pointer]:
+              - cell "EXC-001 Excavator X200" [ref=f15e581]:
+                - generic [ref=f15e582]:
+                  - text: EXC-001
+                  - generic [ref=f15e583]: Excavator X200
+              - cell "Excavadora" [ref=f15e584]
+              - cell "Zona A" [ref=f15e585]
+              - cell "Operativa" [ref=f15e586]
+              - cell "1250" [ref=f15e590]
+              - cell "13/11/2026" [ref=f15e591]
+      - generic [ref=f15e447]:
+        - generic [ref=f15e448]: ARQUIFUSION INTELIGENCIA OPERACIONAL
+        - generic [ref=f15e450]: DESARROLLO LOCAL · API CONECTADA

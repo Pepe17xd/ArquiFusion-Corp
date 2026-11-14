@@ -1,0 +1,211 @@
+- generic [ref=f4e3]:
+  - complementary [ref=f4e5]:
+    - generic [ref=f4e6]: ARQUIFUSION
+    - generic [ref=f4e20]:
+      - generic [ref=f4e24]:
+        - generic [ref=f4e25]: WORKSPACE
+        - generic [ref=f4e26]: Operations
+      - generic [ref=f4e27]: ⌄
+    - generic [ref=f4e28]: OPERATIONS
+    - navigation "Navegación principal" [ref=f4e29]:
+      - button "Command center" [active] [ref=f4e30] [cursor=pointer]
+      - button "Fleet 2" [ref=f4e288] [cursor=pointer]:
+        - generic [ref=f4e43]: Fleet
+        - generic [ref=f4e44]: "2"
+      - button "AI agent command" [ref=f4e45] [cursor=pointer]
+      - button "System activity" [ref=f4e50] [cursor=pointer]
+      - button "Data ingestion" [ref=f4e54] [cursor=pointer]
+    - generic [ref=f4e59]: PLANNED MODULES
+    - navigation "Módulos planificados" [ref=f4e60]:
+      - button "Maintenance PREP" [ref=f4e61] [cursor=pointer]:
+        - generic [ref=f4e64]: Maintenance
+        - generic [ref=f4e65]: PREP
+      - button "Inventory PREP" [ref=f4e66] [cursor=pointer]:
+        - generic [ref=f4e73]: Inventory
+        - generic [ref=f4e74]: PREP
+      - button "Technicians PREP" [ref=f4e75] [cursor=pointer]:
+        - generic [ref=f4e81]: Technicians
+        - generic [ref=f4e82]: PREP
+      - button "Incident center PREP" [ref=f4e83] [cursor=pointer]:
+        - generic [ref=f4e87]: Incident center
+        - generic [ref=f4e88]: PREP
+    - generic [ref=f4e89]:
+      - generic [ref=f4e95]:
+        - generic [ref=f4e96]: CORE SYSTEM
+        - generic [ref=f4e97]: Operational layer
+      - generic [ref=f4e99]: API conectada
+      - generic [ref=f4e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f4e105]: "2.0"
+  - generic [ref=f4e106]:
+    - banner [ref=f4e107]:
+      - generic [ref=f4e108]:
+        - generic [ref=f4e109]: ARQUIFUSION
+        - generic [ref=f4e112]: Command center
+      - generic [ref=f4e113]:
+        - generic [ref=f4e114]:
+          - time [ref=f4e118]: 23:54:39
+          - generic [ref=f4e119]: 13 nov. 2026
+        - generic [ref=f4e120]: API conectada
+        - button "Actualizar datos" [ref=f4e122] [cursor=pointer]
+        - generic "Interfaz local del workspace" [ref=f4e129]: LOCAL
+    - main [ref=f4e131]:
+      - status [ref=f4e606]:
+        - generic [ref=f4e608]: "2 registros procesados: 2 aceptados y 0 rechazados. Original: local://imports/3ca5a31aaa1e771a54b028d40693a76415115ba3592073bb652400ebe6dc5edc.json"
+        - button "Cerrar aviso" [ref=f4e609] [cursor=pointer]
+      - generic [ref=f4e132]:
+        - generic [ref=f4e133]:
+          - generic [ref=f4e134]: ARQUIFUSION / OPERATIONS
+          - heading "Operational overview" [level=1] [ref=f4e750]
+          - paragraph [ref=f4e136]: Fleet conditions, live signals and intelligence in one operational view.
+        - generic [ref=f4e615]: LIVE API DATA
+      - region "Fleet status metrics" [ref=f4e751]:
+        - article [ref=f4e752]:
+          - generic [ref=f4e753]: "01"
+          - generic [ref=f4e757]: Fleet assets
+          - generic [ref=f4e758]: "2"
+          - generic [ref=f4e759]: All registered machines
+        - article [ref=f4e760]:
+          - generic [ref=f4e761]: "02"
+          - generic [ref=f4e765]: Operational
+          - generic [ref=f4e766]: "1"
+          - generic [ref=f4e767]: 50.0% fleet availability
+        - article [ref=f4e768]:
+          - generic [ref=f4e769]: "03"
+          - generic [ref=f4e773]: Maintenance
+          - generic [ref=f4e774]: "1"
+          - generic [ref=f4e775]: Current reported status
+        - article [ref=f4e776]:
+          - generic [ref=f4e777]: "04"
+          - generic [ref=f4e781]: Attention required
+          - generic [ref=f4e782]: "0"
+          - generic [ref=f4e783]: 0 alerts · 0 stopped
+      - generic [ref=f4e784]:
+        - generic [ref=f4e785]:
+          - generic [ref=f4e786]:
+            - generic [ref=f4e787]:
+              - generic [ref=f4e788]: LANGGRAPH / WORKFLOW 01
+              - heading "Intelligence core" [level=2] [ref=f4e789]
+              - paragraph [ref=f4e790]: Fleet risk analysis · deterministic rules
+            - button "Abrir AI Agent Command" [ref=f4e791] [cursor=pointer]
+          - 'img "Flujo real: registros de flota pasan por assessFleet y producen recomendaciones estructuradas" [ref=f4e795]':
+            - generic [ref=f4e798]:
+              - generic [ref=f4e804]: INPUT
+              - generic [ref=f4e805]: Fleet records
+              - generic [ref=f4e806]: Current state + readings
+            - generic [ref=f4e807]:
+              - generic [ref=f4e812]: LANGGRAPH NODE
+              - generic [ref=f4e813]: assessFleet
+              - generic [ref=f4e814]: Rule evaluation
+            - generic [ref=f4e815]:
+              - generic [ref=f4e820]: STRUCTURED OUTPUT
+              - generic [ref=f4e821]: Recommendations
+              - generic [ref=f4e822]: Evidence-backed
+            - generic [ref=f4e823]:
+              - generic [ref=f4e824]: status
+              - generic [ref=f4e826]: temperature
+              - generic [ref=f4e828]: vibration
+          - generic [ref=f4e830]:
+            - generic [ref=f4e836]:
+              - generic [ref=f4e837]: LAST EXECUTION
+              - generic [ref=f4e838]: 13/11/2026, 11:54:04 p. m.
+            - generic [ref=f4e839]: Session only
+            - button "Run evaluation" [ref=f4e843] [cursor=pointer]
+          - generic [ref=f4e844]:
+            - generic [ref=f4e845]: deterministic-rules
+            - generic [ref=f4e846]: 2 recommendations returned
+            - generic [ref=f4e847]: ·
+            - generic [ref=f4e848]: Execution history is not persisted
+        - generic [ref=f4e849]:
+          - generic [ref=f4e850]:
+            - generic [ref=f4e851]:
+              - generic [ref=f4e852]: OPERATIONAL INSIGHTS
+              - heading "Evidence-backed findings" [level=2] [ref=f4e853]
+            - button "Workflow" [ref=f4e854] [cursor=pointer]
+          - generic [ref=f4e857]:
+            - article [ref=f4e858]:
+              - generic [ref=f4e862]:
+                - generic [ref=f4e863]:
+                  - generic [ref=f4e864]: HIGH
+                  - button "BLD-002" [ref=f4e865] [cursor=pointer]
+                - heading "Revisar temperatura elevada" [level=3] [ref=f4e866]
+                - paragraph [ref=f4e867]: La temperatura reportada es 92 °C.
+                - generic [ref=f4e868]: "temperature: 92"
+                - generic [ref=f4e870]: Inspeccionar refrigeración y validar el sensor; confirmar el umbral con las especificaciones del fabricante.
+            - article [ref=f4e871]:
+              - generic [ref=f4e875]:
+                - generic [ref=f4e876]:
+                  - generic [ref=f4e877]: MEDIUM
+                  - button "BLD-002" [ref=f4e878] [cursor=pointer]
+                - heading "Programar inspección de vibración" [level=3] [ref=f4e879]
+                - paragraph [ref=f4e880]: La vibración reportada es 5.1.
+                - generic [ref=f4e881]: "vibration: 5.1"
+                - generic [ref=f4e883]: Comparar con la línea base del modelo y revisar componentes rotativos en la próxima ventana de mantenimiento.
+          - generic [ref=f4e884]:
+            - text: SOURCE · deterministic-rules
+            - generic [ref=f4e885]: · 11:54:04 p. m.
+      - generic [ref=f4e886]:
+        - generic [ref=f4e887]:
+          - generic [ref=f4e888]:
+            - generic [ref=f4e889]: LIVE TELEMETRY / CURRENT READINGS
+            - heading "Signal overview" [level=2] [ref=f4e890]
+            - paragraph [ref=f4e891]: Average of loaded records · no historical series available
+          - generic [ref=f4e892]: 1 / 2 loaded
+        - generic [ref=f4e893]:
+          - 'article "Temperature: mean of 1 records" [ref=f4e894]':
+            - generic [ref=f4e895]: 1/1
+            - generic [ref=f4e900]: 85SOURCE UNIT
+            - generic [ref=f4e901]: Temperature
+            - img "1 of 1 records contain Temperature" [ref=f4e902]
+          - 'article "Vibration: mean of 1 records" [ref=f4e904]':
+            - generic [ref=f4e905]: 1/1
+            - generic [ref=f4e912]: 4.2SOURCE UNIT
+            - generic [ref=f4e913]: Vibration
+            - img "1 of 1 records contain Vibration" [ref=f4e914]
+          - 'article "Pressure: mean of 1 records" [ref=f4e916]':
+            - generic [ref=f4e917]: 1/1
+            - generic [ref=f4e923]: 180SOURCE UNIT
+            - generic [ref=f4e924]: Pressure
+            - img "1 of 1 records contain Pressure" [ref=f4e925]
+          - 'article "Fuel consumption: mean of 1 records" [ref=f4e927]':
+            - generic [ref=f4e928]: 1/1
+            - generic [ref=f4e934]: 18SOURCE UNIT
+            - generic [ref=f4e935]: Fuel consumption
+            - img "1 of 1 records contain Fuel consumption" [ref=f4e936]
+          - 'article "Operating hours: mean of 1 records" [ref=f4e938]':
+            - generic [ref=f4e939]: 1/1
+            - generic [ref=f4e944]: 1,250HOURS
+            - generic [ref=f4e945]: Operating hours
+            - img "1 of 1 records contain Operating hours" [ref=f4e946]
+        - generic [ref=f4e948]:
+          - generic [ref=f4e949]: i
+          - text: Telemetry units are not defined in the source contract. Coverage shows records with a reported value, not sensor health.
+      - generic [ref=f4e950]:
+        - generic [ref=f4e951]:
+          - generic [ref=f4e952]:
+            - generic [ref=f4e953]: REGISTERED EQUIPMENT
+            - heading "Fleet at a glance" [level=2] [ref=f4e954]
+          - button "Open fleet" [ref=f4e955] [cursor=pointer]
+        - table [ref=f4e959]:
+          - rowgroup [ref=f4e960]:
+            - row [ref=f4e961]:
+              - columnheader "MACHINE" [ref=f4e962]
+              - columnheader "CATEGORY" [ref=f4e963]
+              - columnheader "LOCATION" [ref=f4e964]
+              - columnheader "STATUS" [ref=f4e965]
+              - columnheader "HOURS" [ref=f4e966]
+              - columnheader "UPDATED" [ref=f4e967]
+          - rowgroup [ref=f4e968]:
+            - row [ref=f4e969] [cursor=pointer]:
+              - cell "EXC-001 Excavator X200" [ref=f4e970]:
+                - generic [ref=f4e971]:
+                  - text: EXC-001
+                  - generic [ref=f4e972]: Excavator X200
+              - cell "Excavadora" [ref=f4e973]
+              - cell "Zona A" [ref=f4e974]
+              - cell "Operativa" [ref=f4e975]
+              - cell "1250" [ref=f4e979]
+              - cell "13/11/2026" [ref=f4e980]
+      - generic [ref=f4e284]:
+        - generic [ref=f4e285]: ARQUIFUSION OPERATIONS INTELLIGENCE
+        - generic [ref=f4e287]: LOCAL DEVELOPMENT · API CONNECTED

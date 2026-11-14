@@ -1,0 +1,140 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Users\anton\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.12.1
+2 info using node@v24.13.0
+3 silly config load:file:C:\Users\anton\AppData\Roaming\npm\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\anton\Desktop\HackCloud\.npmrc
+5 silly config load:file:C:\Users\anton\.npmrc
+6 silly config load:file:C:\Users\anton\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm install
+8 verbose argv "install" "--fetch-retries" "0" "--fetch-timeout" "15000" "--cache" "C:\\Users\\anton\\AppData\\Local\\Temp\\hackcloud-npm-cache"
+9 verbose logfile logs-max:10 dir:C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_42_27_330Z-
+10 verbose logfile C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_42_27_330Z-debug-0.log
+11 silly logfile done cleaning log files
+12 silly packumentCache heap:4496293888 maxSize:1124073472 maxEntrySize:562036736
+13 silly idealTree buildDeps
+14 silly placeDep ROOT @arquifusion/backend@1.0.0 OK for:  want: file:C:\Users\anton\Desktop\HackCloud\backend
+15 silly placeDep ROOT @arquifusion/frontend@1.0.0 OK for:  want: file:C:\Users\anton\Desktop\HackCloud\frontend
+16 silly fetch manifest @aws-sdk/client-dynamodb@^3.800.0
+17 silly packumentCache full:https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb cache-miss
+18 http fetch GET https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb attempt 1 failed with EACCES
+19 silly fetch manifest @aws-sdk/lib-dynamodb@^3.800.0
+20 silly packumentCache full:https://registry.npmjs.org/@aws-sdk%2flib-dynamodb cache-miss
+21 http fetch GET https://registry.npmjs.org/@aws-sdk%2flib-dynamodb attempt 1 failed with EACCES
+22 silly fetch manifest @aws-sdk/client-s3@^3.800.0
+23 silly packumentCache full:https://registry.npmjs.org/@aws-sdk%2fclient-s3 cache-miss
+24 http fetch GET https://registry.npmjs.org/@aws-sdk%2fclient-s3 attempt 1 failed with EACCES
+25 silly fetch manifest csv-parse@^5.6.0
+26 silly packumentCache full:https://registry.npmjs.org/csv-parse cache-miss
+27 http fetch GET https://registry.npmjs.org/csv-parse attempt 1 failed with EACCES
+28 silly fetch manifest serverless-http@^3.2.0
+29 silly packumentCache full:https://registry.npmjs.org/serverless-http cache-miss
+30 http fetch GET https://registry.npmjs.org/serverless-http attempt 1 failed with EACCES
+31 silly fetch manifest @types/aws-lambda@^8.10.149
+32 silly packumentCache full:https://registry.npmjs.org/@types%2faws-lambda cache-miss
+33 http fetch GET https://registry.npmjs.org/@types%2faws-lambda attempt 1 failed with EACCES
+34 silly fetch manifest @types/node@^22.13.0
+35 silly packumentCache full:https://registry.npmjs.org/@types%2fnode cache-miss
+36 http fetch GET https://registry.npmjs.org/@types%2fnode attempt 1 failed with EACCES
+37 silly fetch manifest serverless@^4.9.0
+38 silly packumentCache full:https://registry.npmjs.org/serverless cache-miss
+39 http fetch GET https://registry.npmjs.org/serverless attempt 1 failed with EACCES
+40 silly fetch manifest serverless-offline@^14.4.0
+41 silly packumentCache full:https://registry.npmjs.org/serverless-offline cache-miss
+42 http fetch GET https://registry.npmjs.org/serverless-offline attempt 1 failed with EACCES
+43 silly fetch manifest ts-node@^10.9.2
+44 silly packumentCache full:https://registry.npmjs.org/ts-node cache-miss
+45 http fetch GET https://registry.npmjs.org/ts-node attempt 1 failed with EACCES
+46 silly fetch manifest typescript@^5.7.3
+47 silly packumentCache full:https://registry.npmjs.org/typescript cache-miss
+48 http fetch GET https://registry.npmjs.org/typescript attempt 1 failed with EACCES
+49 silly placeDep backend @aws-sdk/client-dynamodb@ OK for: @arquifusion/backend@1.0.0 want: ^3.800.0
+50 silly placeDep backend @aws-sdk/client-s3@ OK for: @arquifusion/backend@1.0.0 want: ^3.800.0
+51 silly placeDep backend @aws-sdk/lib-dynamodb@ OK for: @arquifusion/backend@1.0.0 want: ^3.800.0
+52 silly placeDep backend @types/aws-lambda@ OK for: @arquifusion/backend@1.0.0 want: ^8.10.149
+53 silly placeDep backend @types/node@ OK for: @arquifusion/backend@1.0.0 want: ^22.13.0
+54 silly placeDep backend csv-parse@ OK for: @arquifusion/backend@1.0.0 want: ^5.6.0
+55 silly placeDep backend serverless@ OK for: @arquifusion/backend@1.0.0 want: ^4.9.0
+56 silly placeDep backend serverless-http@ OK for: @arquifusion/backend@1.0.0 want: ^3.2.0
+57 silly placeDep backend serverless-offline@ OK for: @arquifusion/backend@1.0.0 want: ^14.4.0
+58 silly placeDep backend ts-node@ OK for: @arquifusion/backend@1.0.0 want: ^10.9.2
+59 silly placeDep backend typescript@ OK for: @arquifusion/backend@1.0.0 want: ^5.7.3
+60 silly fetch manifest @vitejs/plugin-react@^4.3.4
+61 silly packumentCache full:https://registry.npmjs.org/@vitejs%2fplugin-react cache-miss
+62 http fetch GET https://registry.npmjs.org/@vitejs%2fplugin-react attempt 1 failed with EACCES
+63 silly fetch manifest vite@^6.0.7
+64 silly packumentCache full:https://registry.npmjs.org/vite cache-miss
+65 http fetch GET https://registry.npmjs.org/vite attempt 1 failed with EACCES
+66 silly fetch manifest react@^18.3.1
+67 silly packumentCache full:https://registry.npmjs.org/react cache-miss
+68 http fetch GET https://registry.npmjs.org/react attempt 1 failed with EACCES
+69 silly fetch manifest react-dom@^18.3.1
+70 silly packumentCache full:https://registry.npmjs.org/react-dom cache-miss
+71 http fetch GET https://registry.npmjs.org/react-dom attempt 1 failed with EACCES
+72 silly fetch manifest lucide-react@^0.468.0
+73 silly packumentCache full:https://registry.npmjs.org/lucide-react cache-miss
+74 http fetch GET https://registry.npmjs.org/lucide-react attempt 1 failed with EACCES
+75 silly fetch manifest @types/react@^18.3.18
+76 silly packumentCache full:https://registry.npmjs.org/@types%2freact cache-miss
+77 http fetch GET https://registry.npmjs.org/@types%2freact attempt 1 failed with EACCES
+78 silly fetch manifest @types/react-dom@^18.3.5
+79 silly packumentCache full:https://registry.npmjs.org/@types%2freact-dom cache-miss
+80 http fetch GET https://registry.npmjs.org/@types%2freact-dom attempt 1 failed with EACCES
+81 silly fetch manifest typescript@^5.7.3
+82 silly packumentCache full:https://registry.npmjs.org/typescript cache-miss
+83 http fetch GET https://registry.npmjs.org/typescript attempt 1 failed with EACCES
+84 silly fetch manifest tailwindcss@^3.4.17
+85 silly packumentCache full:https://registry.npmjs.org/tailwindcss cache-miss
+86 http fetch GET https://registry.npmjs.org/tailwindcss attempt 1 failed with EACCES
+87 silly fetch manifest postcss@^8.4.49
+88 silly packumentCache full:https://registry.npmjs.org/postcss cache-miss
+89 http fetch GET https://registry.npmjs.org/postcss attempt 1 failed with EACCES
+90 silly fetch manifest autoprefixer@^10.4.20
+91 silly packumentCache full:https://registry.npmjs.org/autoprefixer cache-miss
+92 http fetch GET https://registry.npmjs.org/autoprefixer attempt 1 failed with EACCES
+93 silly placeDep frontend @types/react@ OK for: @arquifusion/frontend@1.0.0 want: ^18.3.18
+94 silly placeDep frontend @types/react-dom@ OK for: @arquifusion/frontend@1.0.0 want: ^18.3.5
+95 silly placeDep frontend @vitejs/plugin-react@ OK for: @arquifusion/frontend@1.0.0 want: ^4.3.4
+96 silly placeDep frontend autoprefixer@ OK for: @arquifusion/frontend@1.0.0 want: ^10.4.20
+97 silly placeDep frontend lucide-react@ OK for: @arquifusion/frontend@1.0.0 want: ^0.468.0
+98 silly placeDep frontend postcss@ OK for: @arquifusion/frontend@1.0.0 want: ^8.4.49
+99 silly placeDep frontend react@ OK for: @arquifusion/frontend@1.0.0 want: ^18.3.1
+100 silly placeDep frontend react-dom@ OK for: @arquifusion/frontend@1.0.0 want: ^18.3.1
+101 silly placeDep frontend tailwindcss@ OK for: @arquifusion/frontend@1.0.0 want: ^3.4.17
+102 silly placeDep frontend typescript@ OK for: @arquifusion/frontend@1.0.0 want: ^5.7.3
+103 silly placeDep frontend vite@ OK for: @arquifusion/frontend@1.0.0 want: ^6.0.7
+104 verbose type system
+105 verbose stack FetchError: request to https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb failed, reason: 
+105 verbose stack     at ClientRequest.<anonymous> (C:\Users\anton\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+105 verbose stack     at ClientRequest.emit (node:events:508:28)
+105 verbose stack     at emitErrorEvent (node:_http_client:108:11)
+105 verbose stack     at _destroy (node:_http_client:962:9)
+105 verbose stack     at onSocketNT (node:_http_client:982:5)
+105 verbose stack     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+106 error code EACCES
+107 error errno EACCES
+108 error FetchError: request to https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb failed, reason: 
+108 error     at ClientRequest.<anonymous> (C:\Users\anton\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+108 error     at ClientRequest.emit (node:events:508:28)
+108 error     at emitErrorEvent (node:_http_client:108:11)
+108 error     at _destroy (node:_http_client:962:9)
+108 error     at onSocketNT (node:_http_client:982:5)
+108 error     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+108 error   code: 'EACCES',
+108 error   errno: 'EACCES',
+108 error   type: 'system',
+108 error   requiredBy: 'backend'
+108 error }
+109 error
+109 error The operation was rejected by your operating system.
+109 error It's possible that the file was already in use (by a text editor or antivirus), or that you lack permissions to access it.
+109 error
+109 error If you believe this might be a permissions issue, please double-check the permissions of the file and its containing directories, or try running the command again as root/Administrator.
+110 silly unfinished npm timer reify 1794627748103
+111 silly unfinished npm timer reify:loadTrees 1794627748104
+112 verbose cwd C:\Users\anton\Desktop\HackCloud
+113 verbose os Windows_NT 10.0.26300
+114 verbose node v24.13.0
+115 verbose npm  v11.12.1
+116 verbose exit 1
+117 verbose code 1
+118 error A complete log of this run can be found in: C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_42_27_330Z-debug-0.log

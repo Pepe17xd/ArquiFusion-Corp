@@ -1,0 +1,134 @@
+- generic [ref=f9e3]:
+  - complementary [ref=f9e5]:
+    - generic [ref=f9e6]: ARQUIFUSION
+    - generic [ref=f9e20]:
+      - generic [ref=f9e24]:
+        - generic [ref=f9e25]: WORKSPACE
+        - generic [ref=f9e26]: Operations
+      - generic [ref=f9e27]: ⌄
+    - generic [ref=f9e28]: OPERATIONS
+    - navigation "Navegación principal" [ref=f9e29]:
+      - button "Command center" [ref=f9e30] [cursor=pointer]
+      - button "Fleet 2" [ref=f9e292] [cursor=pointer]:
+        - generic [ref=f9e43]: Fleet
+        - generic [ref=f9e44]: "2"
+      - button "AI agent command" [active] [ref=f9e45] [cursor=pointer]
+      - button "System activity" [ref=f9e50] [cursor=pointer]
+      - button "Data ingestion" [ref=f9e54] [cursor=pointer]
+    - generic [ref=f9e59]: PLANNED MODULES
+    - navigation "Módulos planificados" [ref=f9e60]:
+      - button "Maintenance PREP" [ref=f9e61] [cursor=pointer]:
+        - generic [ref=f9e64]: Maintenance
+        - generic [ref=f9e65]: PREP
+      - button "Inventory PREP" [ref=f9e66] [cursor=pointer]:
+        - generic [ref=f9e73]: Inventory
+        - generic [ref=f9e74]: PREP
+      - button "Technicians PREP" [ref=f9e75] [cursor=pointer]:
+        - generic [ref=f9e81]: Technicians
+        - generic [ref=f9e82]: PREP
+      - button "Incident center PREP" [ref=f9e83] [cursor=pointer]:
+        - generic [ref=f9e87]: Incident center
+        - generic [ref=f9e88]: PREP
+    - generic [ref=f9e89]:
+      - generic [ref=f9e95]:
+        - generic [ref=f9e96]: CORE SYSTEM
+        - generic [ref=f9e97]: Operational layer
+      - generic [ref=f9e99]: API conectada
+      - generic [ref=f9e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f9e105]: "2.0"
+  - generic [ref=f9e106]:
+    - banner [ref=f9e107]:
+      - generic [ref=f9e108]:
+        - generic [ref=f9e109]: ARQUIFUSION
+        - generic [ref=f9e112]: AI agent command
+      - generic [ref=f9e113]:
+        - generic [ref=f9e114]:
+          - time [ref=f9e118]: 00:02:55
+          - generic [ref=f9e119]: 14 nov. 2026
+        - generic [ref=f9e120]: API conectada
+        - button "Actualizar datos" [ref=f9e122] [cursor=pointer]
+        - generic "Interfaz local del workspace" [ref=f9e129]: LOCAL
+    - main [ref=f9e131]:
+      - generic [ref=f9e132]:
+        - generic [ref=f9e133]:
+          - generic [ref=f9e134]: ARQUIFUSION / OPERATIONS
+          - heading "AI agent command" [level=1] [ref=f9e293]
+          - paragraph [ref=f9e136]: Implemented intelligence capability and the roles planned for the platform.
+        - generic [ref=f9e137]: API DATA
+      - generic [ref=f9e294]:
+        - generic [ref=f9e295]:
+          - generic [ref=f9e296]:
+            - generic [ref=f9e297]:
+              - generic [ref=f9e298]: AI AGENT COMMAND
+              - heading "Agent roster" [level=2] [ref=f9e299]
+            - generic [ref=f9e300]: 1 / 6 OPERATIVE
+          - generic [ref=f9e301]:
+            - button "Predictive Maintenance Agent Fleet risk assessment Operativo" [ref=f9e302] [cursor=pointer]:
+              - generic [ref=f9e307]:
+                - generic [ref=f9e308]: Predictive Maintenance Agent
+                - generic [ref=f9e309]: Fleet risk assessment
+              - generic [ref=f9e310]: Operativo
+            - button "Coordinator Agent Workflow coordination Planificado" [ref=f9e312] [cursor=pointer]:
+              - generic [ref=f9e317]:
+                - generic [ref=f9e318]: Coordinator Agent
+                - generic [ref=f9e319]: Workflow coordination
+              - generic [ref=f9e320]: Planificado
+            - button "Fleet Operations Agent Utilization and dispatch Planificado" [ref=f9e324] [cursor=pointer]:
+              - generic [ref=f9e329]:
+                - generic [ref=f9e330]: Fleet Operations Agent
+                - generic [ref=f9e331]: Utilization and dispatch
+              - generic [ref=f9e332]: Planificado
+            - button "Inventory Intelligence Agent Parts readiness Planificado" [ref=f9e336] [cursor=pointer]:
+              - generic [ref=f9e341]:
+                - generic [ref=f9e342]: Inventory Intelligence Agent
+                - generic [ref=f9e343]: Parts readiness
+              - generic [ref=f9e344]: Planificado
+            - button "Technician Assignment Agent Skills and workload Planificado" [ref=f9e348] [cursor=pointer]:
+              - generic [ref=f9e353]:
+                - generic [ref=f9e354]: Technician Assignment Agent
+                - generic [ref=f9e355]: Skills and workload
+              - generic [ref=f9e356]: Planificado
+            - button "Incident Intelligence Agent Incident triage Planificado" [ref=f9e360] [cursor=pointer]:
+              - generic [ref=f9e365]:
+                - generic [ref=f9e366]: Incident Intelligence Agent
+                - generic [ref=f9e367]: Incident triage
+              - generic [ref=f9e368]: Planificado
+        - generic [ref=f9e372]:
+          - generic [ref=f9e373]: AGENT PROFILE / 01
+          - generic [ref=f9e374]:
+            - generic [ref=f9e379]:
+              - heading "Predictive Maintenance Agent" [level=2] [ref=f9e380]
+              - paragraph [ref=f9e381]: Fleet risk assessment
+            - generic [ref=f9e382]: Operativo
+          - paragraph [ref=f9e384]: Deterministic LangGraph node reviews fleet status, temperature and vibration and returns evidence-backed recommendations.
+          - generic [ref=f9e385]:
+            - generic [ref=f9e386]:
+              - generic [ref=f9e387]: IMPLEMENTATION
+              - generic [ref=f9e388]: LangGraph · assessFleet
+            - generic [ref=f9e389]:
+              - generic [ref=f9e390]: INPUT
+              - generic [ref=f9e391]: Current fleet records
+            - generic [ref=f9e392]:
+              - generic [ref=f9e393]: OUTPUT
+              - generic [ref=f9e394]: Structured recommendations
+            - generic [ref=f9e395]:
+              - generic [ref=f9e396]: TRIGGERS
+              - generic [ref=f9e397]: Status · temperature · vibration
+          - button "Run fleet assessment" [ref=f9e398] [cursor=pointer]
+          - generic [ref=f9e399]:
+            - generic [ref=f9e400]:
+              - heading "Latest returned result" [level=3] [ref=f9e401]
+              - generic [ref=f9e402]: 14/11/2026, 12:01:48 a. m.
+            - generic [ref=f9e407]:
+              - text: Revisar temperatura elevada
+              - paragraph [ref=f9e408]: La temperatura reportada es 92 °C.
+              - button "BLD-002" [ref=f9e409] [cursor=pointer]
+            - generic [ref=f9e416]:
+              - text: Programar inspección de vibración
+              - paragraph [ref=f9e417]: La vibración reportada es 5.1.
+              - button "BLD-002" [ref=f9e418] [cursor=pointer]
+          - generic [ref=f9e421]: Execution timestamp is returned by the API. Persistent run history is not available.
+      - generic [ref=f9e288]:
+        - generic [ref=f9e289]: ARQUIFUSION OPERATIONS INTELLIGENCE
+        - generic [ref=f9e291]: LOCAL DEVELOPMENT · API CONNECTED

@@ -1,0 +1,48 @@
+0 verbose cli C:\Program Files\nodejs\node.exe C:\Users\anton\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+1 info using npm@11.12.1
+2 info using node@v24.13.0
+3 silly config load:file:C:\Users\anton\AppData\Roaming\npm\node_modules\npm\npmrc
+4 silly config load:file:C:\Users\anton\Desktop\HackCloud\.npmrc
+5 silly config load:file:C:\Users\anton\.npmrc
+6 silly config load:file:C:\Users\anton\AppData\Roaming\npm\etc\npmrc
+7 verbose title npm ping
+8 verbose argv "ping" "--fetch-retries" "0" "--fetch-timeout" "15000" "--cache" "C:\\Users\\anton\\AppData\\Local\\Temp\\hackcloud-npm-cache" "--loglevel" "verbose"
+9 verbose logfile logs-max:10 dir:C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_41_53_239Z-
+10 verbose logfile C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_41_53_239Z-debug-0.log
+11 silly logfile done cleaning log files
+12 notice PING https://registry.npmjs.org/
+13 http fetch GET https://registry.npmjs.org/npm attempt 1 failed with EACCES
+14 http fetch GET https://registry.npmjs.org/-/ping attempt 1 failed with EACCES
+15 verbose type system
+16 verbose stack FetchError: request to https://registry.npmjs.org/-/ping failed, reason: 
+16 verbose stack     at ClientRequest.<anonymous> (C:\Users\anton\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+16 verbose stack     at ClientRequest.emit (node:events:508:28)
+16 verbose stack     at emitErrorEvent (node:_http_client:108:11)
+16 verbose stack     at _destroy (node:_http_client:962:9)
+16 verbose stack     at onSocketNT (node:_http_client:982:5)
+16 verbose stack     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+17 error code EACCES
+18 error errno EACCES
+19 error FetchError: request to https://registry.npmjs.org/-/ping failed, reason: 
+19 error     at ClientRequest.<anonymous> (C:\Users\anton\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+19 error     at ClientRequest.emit (node:events:508:28)
+19 error     at emitErrorEvent (node:_http_client:108:11)
+19 error     at _destroy (node:_http_client:962:9)
+19 error     at onSocketNT (node:_http_client:982:5)
+19 error     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+19 error   code: 'EACCES',
+19 error   errno: 'EACCES',
+19 error   type: 'system'
+19 error }
+20 error
+20 error The operation was rejected by your operating system.
+20 error It's possible that the file was already in use (by a text editor or antivirus), or that you lack permissions to access it.
+20 error
+20 error If you believe this might be a permissions issue, please double-check the permissions of the file and its containing directories, or try running the command again as root/Administrator.
+21 verbose cwd C:\Users\anton\Desktop\HackCloud
+22 verbose os Windows_NT 10.0.26300
+23 verbose node v24.13.0
+24 verbose npm  v11.12.1
+25 verbose exit 1
+26 verbose code 1
+27 error A complete log of this run can be found in: C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_41_53_239Z-debug-0.log

@@ -1,0 +1,75 @@
+- generic [ref=f4e3]:
+  - complementary [ref=f4e5]:
+    - generic [ref=f4e6]: ARQUIFUSION
+    - generic [ref=f4e20]:
+      - generic [ref=f4e24]:
+        - generic [ref=f4e25]: WORKSPACE
+        - generic [ref=f4e26]: Operations
+      - generic [ref=f4e27]: ⌄
+    - generic [ref=f4e28]: OPERATIONS
+    - navigation "Navegación principal" [ref=f4e29]:
+      - button "Command center" [ref=f4e30] [cursor=pointer]
+      - button "Fleet 2" [ref=f4e288] [cursor=pointer]:
+        - generic [ref=f4e43]: Fleet
+        - generic [ref=f4e44]: "2"
+      - button "AI agent command" [ref=f4e45] [cursor=pointer]
+      - button "System activity" [ref=f4e50] [cursor=pointer]
+      - button "Data ingestion" [ref=f4e54] [cursor=pointer]
+    - generic [ref=f4e59]: PLANNED MODULES
+    - navigation "Módulos planificados" [ref=f4e60]:
+      - button "Maintenance PREP" [ref=f4e61] [cursor=pointer]:
+        - generic [ref=f4e64]: Maintenance
+        - generic [ref=f4e65]: PREP
+      - button "Inventory PREP" [ref=f4e66] [cursor=pointer]:
+        - generic [ref=f4e73]: Inventory
+        - generic [ref=f4e74]: PREP
+      - button "Technicians PREP" [ref=f4e75] [cursor=pointer]:
+        - generic [ref=f4e81]: Technicians
+        - generic [ref=f4e82]: PREP
+      - button "Incident center PREP" [ref=f4e83] [cursor=pointer]:
+        - generic [ref=f4e87]: Incident center
+        - generic [ref=f4e88]: PREP
+    - generic [ref=f4e89]:
+      - generic [ref=f4e95]:
+        - generic [ref=f4e96]: CORE SYSTEM
+        - generic [ref=f4e97]: Operational layer
+      - generic [ref=f4e99]: API conectada
+      - generic [ref=f4e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f4e105]: "2.0"
+  - generic [ref=f4e106]:
+    - banner [ref=f4e107]:
+      - button "Abrir navegación" [ref=f4e542] [cursor=pointer]
+      - generic [ref=f4e544]: ARQUIFUSION
+      - generic [ref=f4e113]:
+        - generic [ref=f4e120]: API conectada
+        - button "Actualizar datos" [ref=f4e122] [cursor=pointer]
+    - main [ref=f4e131]:
+      - status [ref=f4e599]:
+        - generic [ref=f4e601]: "2 registros procesados: 2 aceptados y 0 rechazados. Original: local://imports/d2ea90e321c73be744c102b62dd0fbd81eeceea0af27f6dd9784f93b8f524769.csv"
+        - button "Cerrar aviso" [ref=f4e602] [cursor=pointer]
+      - generic [ref=f4e133]:
+        - generic [ref=f4e134]: ARQUIFUSION / OPERATIONS
+        - heading "Data ingestion" [level=1] [ref=f4e560]
+        - paragraph [ref=f4e136]: Normalize fleet records from source files.
+      - generic [ref=f4e561]:
+        - generic [ref=f4e562]:
+          - generic [ref=f4e567]: FLEET DATA / INGESTION
+          - heading "Bring source records into the fleet" [level=2] [ref=f4e568]
+          - paragraph [ref=f4e569]: CSV and JSON files use the same validation and machine normalization flow.
+        - generic [ref=f4e570] [cursor=pointer]:
+          - button "Drop a file here or browse CSV or JSON · Max file size follows the API configuration Select source file" [ref=f4e571]
+          - generic [ref=f4e576]: Drop a file here or browse
+          - generic [ref=f4e577]: CSV or JSON · Max file size follows the API configuration
+          - generic [ref=f4e578]: Select source file
+        - generic [ref=f4e579]:
+          - article [ref=f4e580]:
+            - generic [ref=f4e584]: CSV source
+            - generic [ref=f4e585]: Headers map to the normalized Machine fields supported by the API.
+          - article [ref=f4e586]:
+            - generic [ref=f4e592]: JSON source
+            - generic [ref=f4e593]: JSON records follow the same normalization and upsert contract.
+        - generic [ref=f4e594]: Accepted records are upserted by machine identifier. Rejected rows and the original file URI are reported by the service.
+      - generic [ref=f4e284]:
+        - generic [ref=f4e285]: ARQUIFUSION OPERATIONS INTELLIGENCE
+        - generic [ref=f4e287]: LOCAL DEVELOPMENT · API CONNECTED

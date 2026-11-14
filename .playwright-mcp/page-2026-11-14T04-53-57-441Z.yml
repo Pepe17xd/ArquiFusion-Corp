@@ -1,0 +1,76 @@
+- generic [ref=f4e3]:
+  - complementary [ref=f4e5]:
+    - generic [ref=f4e6]: ARQUIFUSION
+    - generic [ref=f4e20]:
+      - generic [ref=f4e24]:
+        - generic [ref=f4e25]: WORKSPACE
+        - generic [ref=f4e26]: Operations
+      - generic [ref=f4e27]: ⌄
+    - generic [ref=f4e28]: OPERATIONS
+    - navigation "Navegación principal" [ref=f4e29]:
+      - button "Command center" [ref=f4e30] [cursor=pointer]
+      - button "Fleet 2" [ref=f4e288] [cursor=pointer]:
+        - generic [ref=f4e43]: Fleet
+        - generic [ref=f4e44]: "2"
+      - button "AI agent command" [ref=f4e45] [cursor=pointer]
+      - button "System activity" [active] [ref=f4e50] [cursor=pointer]
+      - button "Data ingestion" [ref=f4e54] [cursor=pointer]
+    - generic [ref=f4e59]: PLANNED MODULES
+    - navigation "Módulos planificados" [ref=f4e60]:
+      - button "Maintenance PREP" [ref=f4e61] [cursor=pointer]:
+        - generic [ref=f4e64]: Maintenance
+        - generic [ref=f4e65]: PREP
+      - button "Inventory PREP" [ref=f4e66] [cursor=pointer]:
+        - generic [ref=f4e73]: Inventory
+        - generic [ref=f4e74]: PREP
+      - button "Technicians PREP" [ref=f4e75] [cursor=pointer]:
+        - generic [ref=f4e81]: Technicians
+        - generic [ref=f4e82]: PREP
+      - button "Incident center PREP" [ref=f4e83] [cursor=pointer]:
+        - generic [ref=f4e87]: Incident center
+        - generic [ref=f4e88]: PREP
+    - generic [ref=f4e89]:
+      - generic [ref=f4e95]:
+        - generic [ref=f4e96]: CORE SYSTEM
+        - generic [ref=f4e97]: Operational layer
+      - generic [ref=f4e99]: API conectada
+      - generic [ref=f4e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f4e105]: "2.0"
+  - generic [ref=f4e106]:
+    - banner [ref=f4e107]:
+      - generic [ref=f4e108]:
+        - generic [ref=f4e109]: ARQUIFUSION
+        - generic [ref=f4e112]: System activity
+      - generic [ref=f4e113]:
+        - generic [ref=f4e114]:
+          - time [ref=f4e118]: 23:53:56
+          - generic [ref=f4e119]: 13 nov. 2026
+        - generic [ref=f4e120]: API conectada
+        - button "Actualizar datos" [ref=f4e122] [cursor=pointer]
+        - generic "Interfaz local del workspace" [ref=f4e129]: LOCAL
+    - main [ref=f4e131]:
+      - status [ref=f4e606]:
+        - generic [ref=f4e608]: "2 registros procesados: 2 aceptados y 0 rechazados. Original: local://imports/3ca5a31aaa1e771a54b028d40693a76415115ba3592073bb652400ebe6dc5edc.json"
+        - button "Cerrar aviso" [ref=f4e609] [cursor=pointer]
+      - generic [ref=f4e132]:
+        - generic [ref=f4e133]:
+          - generic [ref=f4e134]: ARQUIFUSION / OPERATIONS
+          - heading "System activity" [level=1] [ref=f4e614]
+          - paragraph [ref=f4e136]: Operational traceability status.
+        - generic [ref=f4e615]: LIVE API DATA
+      - generic [ref=f4e617]:
+        - generic [ref=f4e621]: SYSTEM ACTIVITY / AUDIT
+        - heading "Persistent event history is not available" [level=2] [ref=f4e622]
+        - paragraph [ref=f4e623]: The backend currently exposes no event log endpoint or durable activity store. Import and workflow responses appear in their respective modules only; this view does not present session data as an audit trail.
+        - generic [ref=f4e624]:
+          - generic [ref=f4e625]: TIMESTAMP
+          - generic [ref=f4e626]: ACTOR
+          - generic [ref=f4e627]: ACTION
+          - generic [ref=f4e628]: RESOURCE
+          - generic [ref=f4e629]: RESULT
+          - generic [ref=f4e630]: RUN ID
+        - text: "Future contract: append-only events with actor, action, resource, outcome, severity, duration and execution identifier."
+      - generic [ref=f4e284]:
+        - generic [ref=f4e285]: ARQUIFUSION OPERATIONS INTELLIGENCE
+        - generic [ref=f4e287]: LOCAL DEVELOPMENT · API CONNECTED

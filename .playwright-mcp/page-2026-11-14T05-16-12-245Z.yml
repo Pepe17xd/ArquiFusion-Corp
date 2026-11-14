@@ -1,0 +1,140 @@
+- generic [ref=f15e3]:
+  - complementary [ref=f15e5]:
+    - generic [ref=f15e6]: ARQUIFUSION
+    - generic [ref=f15e20]:
+      - generic [ref=f15e24]:
+        - generic [ref=f15e25]: ESPACIO DE TRABAJO
+        - generic [ref=f15e26]: Operaciones
+      - generic [ref=f15e27]: ⌄
+    - generic [ref=f15e28]: OPERACIONES
+    - navigation "Navegación principal" [ref=f15e29]:
+      - button "Centro de mando" [ref=f15e30] [cursor=pointer]
+      - button "Flota 2" [ref=f15e451] [cursor=pointer]:
+        - generic [ref=f15e43]: Flota
+        - generic [ref=f15e44]: "2"
+      - button "Centro de agentes" [active] [ref=f15e45] [cursor=pointer]
+      - button "Actividad del sistema" [ref=f15e50] [cursor=pointer]
+      - button "Ingesta de datos" [ref=f15e54] [cursor=pointer]
+    - generic [ref=f15e59]: MÓDULOS PLANIFICADOS
+    - navigation "Módulos planificados" [ref=f15e60]:
+      - button "Mantenimiento PLAN" [ref=f15e61] [cursor=pointer]:
+        - generic [ref=f15e64]: Mantenimiento
+        - generic [ref=f15e65]: PLAN
+      - button "Inventario PLAN" [ref=f15e66] [cursor=pointer]:
+        - generic [ref=f15e73]: Inventario
+        - generic [ref=f15e74]: PLAN
+      - button "Técnicos PLAN" [ref=f15e75] [cursor=pointer]:
+        - generic [ref=f15e81]: Técnicos
+        - generic [ref=f15e82]: PLAN
+      - button "Incidentes PLAN" [ref=f15e83] [cursor=pointer]:
+        - generic [ref=f15e87]: Incidentes
+        - generic [ref=f15e88]: PLAN
+    - generic [ref=f15e89]:
+      - generic [ref=f15e95]:
+        - generic [ref=f15e96]: SISTEMA CENTRAL
+        - generic [ref=f15e97]: Capa operativa
+      - generic [ref=f15e99]: API conectada
+      - generic [ref=f15e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f15e105]: "2.0"
+  - generic [ref=f15e106]:
+    - banner [ref=f15e107]:
+      - button "Abrir navegación" [ref=f15e452] [cursor=pointer]
+      - generic [ref=f15e454]: ARQUIFUSION
+      - generic [ref=f15e113]:
+        - generic [ref=f15e120]: API conectada
+        - button "Actualizar datos" [ref=f15e122] [cursor=pointer]
+    - main [ref=f15e131]:
+      - generic [ref=f15e132]:
+        - generic [ref=f15e133]:
+          - generic [ref=f15e134]: ARQUIFUSION / OPERACIONES
+          - heading "Centro de agentes" [level=1] [ref=f15e598]
+          - paragraph [ref=f15e136]: Workflow operativo y roles planificados para la plataforma.
+        - generic [ref=f15e137]: DATOS DE API
+      - generic [ref=f15e599]:
+        - generic [ref=f15e600]:
+          - generic [ref=f15e601]:
+            - generic [ref=f15e602]:
+              - generic [ref=f15e603]:
+                - generic [ref=f15e604]: ROLES DEL ECOSISTEMA
+                - heading "Especialidades planificadas" [level=2] [ref=f15e605]
+              - generic [ref=f15e606]: 6 ROLES · PLANIFICADOS
+            - generic [ref=f15e607]:
+              - button "Agente coordinador Organización del ecosistema Planificado" [pressed] [ref=f15e608] [cursor=pointer]:
+                - generic [ref=f15e620]:
+                  - generic [ref=f15e621]: Agente coordinador
+                  - generic [ref=f15e622]: Organización del ecosistema
+                - generic [ref=f15e623]: Planificado
+              - button "Agente de mantenimiento predictivo Patrones de desgaste y fallos Planificado" [ref=f15e627] [cursor=pointer]:
+                - generic [ref=f15e634]:
+                  - generic [ref=f15e635]: Agente de mantenimiento predictivo
+                  - generic [ref=f15e636]: Patrones de desgaste y fallos
+                - generic [ref=f15e637]: Planificado
+              - button "Agente de operaciones de flota Actividad y productividad Planificado" [ref=f15e641] [cursor=pointer]:
+                - generic [ref=f15e648]:
+                  - generic [ref=f15e649]: Agente de operaciones de flota
+                  - generic [ref=f15e650]: Actividad y productividad
+                - generic [ref=f15e651]: Planificado
+              - button "Agente de inteligencia de inventario Repuestos y existencias Planificado" [ref=f15e655] [cursor=pointer]:
+                - generic [ref=f15e663]:
+                  - generic [ref=f15e664]: Agente de inteligencia de inventario
+                  - generic [ref=f15e665]: Repuestos y existencias
+                - generic [ref=f15e666]: Planificado
+              - button "Agente de asignación de técnicos Especialistas y carga de trabajo Planificado" [ref=f15e670] [cursor=pointer]:
+                - generic [ref=f15e679]:
+                  - generic [ref=f15e680]: Agente de asignación de técnicos
+                  - generic [ref=f15e681]: Especialistas y carga de trabajo
+                - generic [ref=f15e682]: Planificado
+              - button "Agente de inteligencia de incidentes Análisis y relaciones de incidentes Planificado" [ref=f15e686] [cursor=pointer]:
+                - generic [ref=f15e694]:
+                  - generic [ref=f15e695]: Agente de inteligencia de incidentes
+                  - generic [ref=f15e696]: Análisis y relaciones de incidentes
+                - generic [ref=f15e697]: Planificado
+          - generic [ref=f15e701]:
+            - generic [ref=f15e702]: PERFIL DE ESPECIALIDAD · COORDINACIÓN
+            - generic [ref=f15e703]:
+              - generic [ref=f15e715]:
+                - heading "Agente coordinador" [level=2] [ref=f15e716]
+                - paragraph [ref=f15e717]: Organización del ecosistema
+              - generic [ref=f15e718]: Planificado
+            - paragraph [ref=f15e722]: Coordinará el trabajo entre especialidades. No existe todavía una implementación de este agente en el backend.
+            - generic [ref=f15e723]:
+              - generic [ref=f15e727]: Capacidad planificada
+              - generic [ref=f15e728]: No dispone de endpoint, ejecución, entradas ni historial de resultados en el backend.
+        - generic [ref=f15e729]:
+          - generic [ref=f15e730]:
+            - generic [ref=f15e731]:
+              - generic [ref=f15e732]: LANGGRAPH / WORKFLOW 01
+              - heading "Evaluación de flota" [level=2] [ref=f15e733]
+              - paragraph [ref=f15e734]: Análisis determinista del estado de la flota
+            - button "Abrir centro de agentes" [ref=f15e735] [cursor=pointer]
+          - 'img "Flujo real: registros de flota pasan por assessFleet y producen recomendaciones estructuradas" [ref=f15e739]':
+            - generic [ref=f15e742]:
+              - generic [ref=f15e748]: ENTRADA
+              - generic [ref=f15e749]: Registros de flota
+              - generic [ref=f15e750]: Estado y lecturas actuales
+            - generic [ref=f15e751]:
+              - generic [ref=f15e756]: NODO LANGGRAPH
+              - generic [ref=f15e757]: assessFleet
+              - generic [ref=f15e758]: Evaluación de reglas
+            - generic [ref=f15e759]:
+              - generic [ref=f15e764]: SALIDA ESTRUCTURADA
+              - generic [ref=f15e765]: Recomendaciones
+              - generic [ref=f15e766]: Con evidencia
+            - generic [ref=f15e767]:
+              - generic [ref=f15e768]: estado
+              - generic [ref=f15e770]: temperatura
+              - generic [ref=f15e772]: vibración
+          - generic [ref=f15e774]:
+            - generic [ref=f15e780]:
+              - generic [ref=f15e781]: ÚLTIMA EJECUCIÓN
+              - generic [ref=f15e782]: 14/11/2026, 12:15:24 a. m.
+            - button "Ejecutar evaluación" [ref=f15e783] [cursor=pointer]
+          - generic [ref=f15e784]:
+            - generic [ref=f15e785]: deterministic-rules
+            - generic [ref=f15e786]: 2 recomendaciones recibidas
+            - generic [ref=f15e787]: ·
+            - generic [ref=f15e788]: El historial de ejecuciones no se conserva
+      - generic [ref=f15e447]:
+        - generic [ref=f15e448]: ARQUIFUSION INTELIGENCIA OPERACIONAL
+        - generic [ref=f15e450]: DESARROLLO LOCAL · API CONECTADA

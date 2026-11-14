@@ -1,0 +1,83 @@
+Mission 0 npm install retry
+Timestamp: 2026-11-13T22:46:30.6348965-05:00
+Registry: https://registry.npmjs.org/
+Command: npm.cmd install --fetch-retries=0 --fetch-timeout=15000 --cache %TEMP%\hackcloud-npm-cache --loglevel verbose
+npm.cmd : npm verbose cli C:\Program Files\nodejs\node.exe 
+C:\Users\anton\AppData\Roaming\npm\node_modules\npm\bin\npm-cli.js
+En l�nea: 2 Car�cter: 370
++ ... oding utf8; npm.cmd install --fetch-retries=0 --fetch-timeout=15000 - ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm verbose cli...\bin\npm-cli.js:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+npm info using npm@11.12.1
+npm info using node@v24.13.0
+npm verbose title npm install
+npm verbose argv "install" "--fetch-retries" "0" "--fetch-timeout" "15000" "--cache" 
+"C:\\Users\\anton\\AppData\\Local\\Temp\\hackcloud-npm-cache" "--loglevel" "verbose"
+npm verbose logfile logs-max:10 
+dir:C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_46_31_507Z-
+npm verbose logfile C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_46_31_507Z-debug-0.log
+npm http fetch GET https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/@aws-sdk%2flib-dynamodb attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/@aws-sdk%2fclient-s3 attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/csv-parse attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/serverless-http attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/@types%2faws-lambda attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/@types%2fnode attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/serverless attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/serverless-offline attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/ts-node attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/typescript attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/@vitejs%2fplugin-react attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/vite attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/react attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/react-dom attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/lucide-react attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/@types%2freact attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/@types%2freact-dom attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/typescript attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/tailwindcss attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/postcss attempt 1 failed with EACCES
+npm http fetch GET https://registry.npmjs.org/autoprefixer attempt 1 failed with EACCES
+npm verbose type system
+npm verbose stack FetchError: request to https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb failed, reason: 
+npm verbose stack     at ClientRequest.<anonymous> 
+(C:\Users\anton\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+npm verbose stack     at ClientRequest.emit (node:events:508:28)
+npm verbose stack     at emitErrorEvent (node:_http_client:108:11)
+npm verbose stack     at _destroy (node:_http_client:962:9)
+npm verbose stack     at onSocketNT (node:_http_client:982:5)
+npm verbose stack     at process.processTicksAndRejections (node:internal/process/task_queues:90:21)
+npm error code EACCES
+npm error errno EACCES
+npm error FetchError: request to https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb failed, reason: 
+npm error     at ClientRequest.<anonymous> 
+(C:\Users\anton\AppData\Roaming\npm\node_modules\npm\node_modules\minipass-fetch\lib\index.js:130:14)
+npm error     at ClientRequest.emit (node:events:508:28)
+npm error     at emitErrorEvent (node:_http_client:108:11)
+npm error     at _destroy (node:_http_client:962:9)
+npm error     at onSocketNT (node:_http_client:982:5)
+npm error     at process.processTicksAndRejections (node:internal/process/task_queues:90:21) {
+npm error   code: 'EACCES',
+npm error   errno: 'EACCES',
+npm error   type: 'system',
+npm error   requiredBy: 'backend'
+npm error }
+npm error
+npm error The operation was rejected by your operating system.
+npm error It's possible that the file was already in use (by a text editor or antivirus), or that you lack permissions 
+to access it.
+npm error
+npm error If you believe this might be a permissions issue, please double-check the permissions of the file and its 
+containing directories, or try running the command again as root/Administrator.
+npm verbose cwd C:\Users\anton\Desktop\HackCloud
+npm verbose os Windows_NT 10.0.26300
+npm verbose node v24.13.0
+npm verbose npm  v11.12.1
+npm verbose exit 1
+npm verbose code 1
+npm error A complete log of this run can be found in: 
+C:\Users\anton\AppData\Local\Temp\hackcloud-npm-cache\_logs\2026-11-14T03_46_31_507Z-debug-0.log
+
+Result: exit 1

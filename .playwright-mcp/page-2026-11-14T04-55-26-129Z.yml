@@ -1,0 +1,134 @@
+- generic [ref=f4e3]:
+  - complementary [ref=f4e5]:
+    - generic [ref=f4e6]: ARQUIFUSION
+    - generic [ref=f4e20]:
+      - generic [ref=f4e24]:
+        - generic [ref=f4e25]: WORKSPACE
+        - generic [ref=f4e26]: Operations
+      - generic [ref=f4e27]: ⌄
+    - generic [ref=f4e28]: OPERATIONS
+    - navigation "Navegación principal" [ref=f4e29]:
+      - button "Command center" [ref=f4e30] [cursor=pointer]
+      - button "Fleet 2" [ref=f4e288] [cursor=pointer]:
+        - generic [ref=f4e43]: Fleet
+        - generic [ref=f4e44]: "2"
+      - button "AI agent command" [ref=f4e45] [cursor=pointer]
+      - button "System activity" [ref=f4e50] [cursor=pointer]
+      - button "Data ingestion" [ref=f4e54] [cursor=pointer]
+    - generic [ref=f4e59]: PLANNED MODULES
+    - navigation "Módulos planificados" [ref=f4e60]:
+      - button "Maintenance PREP" [ref=f4e61] [cursor=pointer]:
+        - generic [ref=f4e64]: Maintenance
+        - generic [ref=f4e65]: PREP
+      - button "Inventory PREP" [ref=f4e66] [cursor=pointer]:
+        - generic [ref=f4e73]: Inventory
+        - generic [ref=f4e74]: PREP
+      - button "Technicians PREP" [ref=f4e75] [cursor=pointer]:
+        - generic [ref=f4e81]: Technicians
+        - generic [ref=f4e82]: PREP
+      - button "Incident center PREP" [ref=f4e83] [cursor=pointer]:
+        - generic [ref=f4e87]: Incident center
+        - generic [ref=f4e88]: PREP
+    - generic [ref=f4e89]:
+      - generic [ref=f4e95]:
+        - generic [ref=f4e96]: CORE SYSTEM
+        - generic [ref=f4e97]: Operational layer
+      - generic [ref=f4e99]: API conectada
+      - generic [ref=f4e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f4e105]: "2.0"
+  - generic [ref=f4e106]:
+    - banner [ref=f4e107]:
+      - generic [ref=f4e108]:
+        - generic [ref=f4e109]: ARQUIFUSION
+        - generic [ref=f4e112]: Fleet assets
+      - generic [ref=f4e113]:
+        - generic [ref=f4e114]:
+          - time [ref=f4e118]: 23:55:26
+          - generic [ref=f4e119]: 13 nov. 2026
+        - generic [ref=f4e120]: API conectada
+        - button "Actualizar datos" [ref=f4e122] [cursor=pointer]
+        - generic "Interfaz local del workspace" [ref=f4e129]: LOCAL
+    - main [ref=f4e131]:
+      - status [ref=f4e606]:
+        - generic [ref=f4e608]: "2 registros procesados: 2 aceptados y 0 rechazados. Original: local://imports/3ca5a31aaa1e771a54b028d40693a76415115ba3592073bb652400ebe6dc5edc.json"
+        - button "Cerrar aviso" [ref=f4e609] [cursor=pointer]
+      - generic [ref=f4e132]:
+        - generic [ref=f4e133]:
+          - generic [ref=f4e134]: ARQUIFUSION / OPERATIONS
+          - heading "Fleet assets" [level=1] [ref=f4e981]
+          - paragraph [ref=f4e136]: Search and inspect registered machinery.
+        - generic [ref=f4e615]: LIVE API DATA
+      - region "Fleet status metrics" [ref=f4e982]:
+        - article [ref=f4e983]:
+          - generic [ref=f4e984]: "01"
+          - generic [ref=f4e988]: Fleet assets
+          - generic [ref=f4e989]: "2"
+          - generic [ref=f4e990]: All registered machines
+        - article [ref=f4e991]:
+          - generic [ref=f4e992]: "02"
+          - generic [ref=f4e996]: Operational
+          - generic [ref=f4e997]: "1"
+          - generic [ref=f4e998]: 50.0% fleet availability
+        - article [ref=f4e999]:
+          - generic [ref=f4e1000]: "03"
+          - generic [ref=f4e1004]: Maintenance
+          - generic [ref=f4e1005]: "1"
+          - generic [ref=f4e1006]: Current reported status
+        - article [ref=f4e1007]:
+          - generic [ref=f4e1008]: "04"
+          - generic [ref=f4e1012]: Attention required
+          - generic [ref=f4e1013]: "0"
+          - generic [ref=f4e1014]: 0 alerts · 0 stopped
+      - generic [ref=f4e1015]:
+        - generic [ref=f4e1016]:
+          - generic [ref=f4e1017]:
+            - textbox "Search ID, model or location" [ref=f4e1021]: EXC
+            - button "Search" [active] [ref=f4e1022] [cursor=pointer]
+          - generic [ref=f4e1023]:
+            - generic [ref=f4e1024]:
+              - generic [ref=f4e1025]: Status
+              - combobox "Status" [ref=f4e1026]:
+                - option "All statuses"
+                - option "operational" [selected]
+                - option "maintenance"
+                - option "stopped"
+                - option "alert"
+            - generic [ref=f4e1027]:
+              - generic [ref=f4e1028]: Category
+              - combobox "Category" [ref=f4e1029]:
+                - option "All categories" [selected]
+                - option "Bulldozer"
+                - option "Excavadora"
+        - generic [ref=f4e1030]:
+          - generic [ref=f4e1032]:
+            - generic [ref=f4e1033]: REGISTERED EQUIPMENT
+            - heading "Fleet records" [level=2] [ref=f4e1034]
+          - table [ref=f4e1036]:
+            - rowgroup [ref=f4e1037]:
+              - row [ref=f4e1038]:
+                - columnheader "MACHINE" [ref=f4e1039]
+                - columnheader "CATEGORY" [ref=f4e1040]
+                - columnheader "LOCATION" [ref=f4e1041]
+                - columnheader "STATUS" [ref=f4e1042]
+                - columnheader "HOURS" [ref=f4e1043]
+                - columnheader "UPDATED" [ref=f4e1044]
+            - rowgroup [ref=f4e1045]:
+              - row [ref=f4e1046] [cursor=pointer]:
+                - cell "EXC-001 Excavator X200" [ref=f4e1047]:
+                  - generic [ref=f4e1048]:
+                    - text: EXC-001
+                    - generic [ref=f4e1049]: Excavator X200
+                - cell "Excavadora" [ref=f4e1050]
+                - cell "Zona A" [ref=f4e1051]
+                - cell "Operativa" [ref=f4e1052]
+                - cell "1250" [ref=f4e1056]
+                - cell "13/11/2026" [ref=f4e1057]
+        - generic [ref=f4e1058]:
+          - generic [ref=f4e1059]: Page 1 · 1 records shown / 2 total
+          - generic [ref=f4e1060]:
+            - button "Previous" [disabled] [ref=f4e1061]
+            - button "Next" [disabled] [ref=f4e1064]
+      - generic [ref=f4e284]:
+        - generic [ref=f4e285]: ARQUIFUSION OPERATIONS INTELLIGENCE
+        - generic [ref=f4e287]: LOCAL DEVELOPMENT · API CONNECTED

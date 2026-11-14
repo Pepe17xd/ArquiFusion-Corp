@@ -1,0 +1,203 @@
+- generic [ref=f14e3]:
+  - complementary [ref=f14e5]:
+    - generic [ref=f14e6]: ARQUIFUSION
+    - generic [ref=f14e20]:
+      - generic [ref=f14e24]:
+        - generic [ref=f14e25]: ESPACIO DE TRABAJO
+        - generic [ref=f14e26]: Operaciones
+      - generic [ref=f14e27]: ⌄
+    - generic [ref=f14e28]: OPERACIONES
+    - navigation "Navegación principal" [ref=f14e29]:
+      - button "Centro de mando" [ref=f14e30] [cursor=pointer]
+      - button "Flota 0" [ref=f14e37] [cursor=pointer]:
+        - generic [ref=f14e43]: Flota
+        - generic [ref=f14e44]: "0"
+      - button "Centro de agentes" [ref=f14e45] [cursor=pointer]
+      - button "Actividad del sistema" [ref=f14e50] [cursor=pointer]
+      - button "Ingesta de datos" [ref=f14e54] [cursor=pointer]
+    - generic [ref=f14e59]: MÓDULOS PLANIFICADOS
+    - navigation "Módulos planificados" [ref=f14e60]:
+      - button "Mantenimiento PLAN" [ref=f14e61] [cursor=pointer]:
+        - generic [ref=f14e64]: Mantenimiento
+        - generic [ref=f14e65]: PLAN
+      - button "Inventario PLAN" [ref=f14e66] [cursor=pointer]:
+        - generic [ref=f14e73]: Inventario
+        - generic [ref=f14e74]: PLAN
+      - button "Técnicos PLAN" [ref=f14e75] [cursor=pointer]:
+        - generic [ref=f14e81]: Técnicos
+        - generic [ref=f14e82]: PLAN
+      - button "Incidentes PLAN" [ref=f14e83] [cursor=pointer]:
+        - generic [ref=f14e87]: Incidentes
+        - generic [ref=f14e88]: PLAN
+    - generic [ref=f14e89]:
+      - generic [ref=f14e95]:
+        - generic [ref=f14e96]: SISTEMA CENTRAL
+        - generic [ref=f14e97]: Capa operativa
+      - generic [ref=f14e99]: Comprobando API
+      - generic [ref=f14e101]:
+        - text: ARQUIFUSION
+        - generic [ref=f14e105]: "2.0"
+  - generic [ref=f14e106]:
+    - banner [ref=f14e107]:
+      - generic [ref=f14e108]:
+        - generic [ref=f14e109]: ARQUIFUSION
+        - generic [ref=f14e112]: Centro de mando
+      - generic [ref=f14e113]:
+        - generic [ref=f14e114]:
+          - time [ref=f14e118]: 00:14:31
+          - generic [ref=f14e119]: 14 nov. 2026
+        - generic [ref=f14e120]: Comprobando API
+        - button "Actualizar datos" [ref=f14e122] [cursor=pointer]
+        - generic "Interfaz local del workspace" [ref=f14e129]: LOCAL
+    - main [ref=f14e131]:
+      - generic [ref=f14e132]:
+        - generic [ref=f14e133]:
+          - generic [ref=f14e134]: ARQUIFUSION / OPERACIONES
+          - heading "Centro de mando" [level=1] [ref=f14e135]
+          - paragraph [ref=f14e136]: Estado de la flota, señales actuales e inteligencia operacional en una sola vista.
+        - generic [ref=f14e137]: REVISANDO API
+      - region "Indicadores de estado de la flota" [ref=f14e139]:
+        - article [ref=f14e140]:
+          - generic [ref=f14e141]: "01"
+          - generic [ref=f14e145]: Equipos registrados
+          - generic [ref=f14e148]: Total de maquinaria
+        - article [ref=f14e149]:
+          - generic [ref=f14e150]: "02"
+          - generic [ref=f14e154]: Operativas
+          - generic [ref=f14e157]: Estado informado
+        - article [ref=f14e158]:
+          - generic [ref=f14e159]: "03"
+          - generic [ref=f14e163]: En mantenimiento
+          - generic [ref=f14e166]: Estado informado
+        - article [ref=f14e167]:
+          - generic [ref=f14e168]: "04"
+          - generic [ref=f14e172]: Requieren atención
+          - generic [ref=f14e175]: Alertas y equipos detenidos
+      - region "Un núcleo. Seis especialidades." [ref=f14e176]:
+        - generic [ref=f14e177]:
+          - generic [ref=f14e178]:
+            - generic [ref=f14e179]: ECOSISTEMA DE INTELIGENCIA
+            - heading "Un núcleo. Seis especialidades." [level=2] [ref=f14e180]
+            - paragraph [ref=f14e181]: El workflow operativo evalúa datos reales de la flota; los demás roles son capacidades planificadas.
+          - generic [ref=f14e182]: Arquitectura objetivo
+        - generic [ref=f14e184]:
+          - button "Coordinación Planificado Orquestación" [pressed] [ref=f14e185] [cursor=pointer]:
+            - generic [ref=f14e196]:
+              - generic [ref=f14e197]: Coordinación
+              - generic [ref=f14e198]: Planificado
+            - generic [ref=f14e200]: Orquestación
+          - button "Mantenimiento predictivo Planificado Mantenimiento" [ref=f14e201] [cursor=pointer]:
+            - generic [ref=f14e207]:
+              - generic [ref=f14e208]: Mantenimiento predictivo
+              - generic [ref=f14e209]: Planificado
+            - generic [ref=f14e211]: Mantenimiento
+          - button "Operaciones de flota Planificado Operaciones" [ref=f14e212] [cursor=pointer]:
+            - generic [ref=f14e218]:
+              - generic [ref=f14e219]: Operaciones de flota
+              - generic [ref=f14e220]: Planificado
+            - generic [ref=f14e222]: Operaciones
+          - button "Inteligencia de inventario Planificado Repuestos" [ref=f14e223] [cursor=pointer]:
+            - generic [ref=f14e230]:
+              - generic [ref=f14e231]: Inteligencia de inventario
+              - generic [ref=f14e232]: Planificado
+            - generic [ref=f14e234]: Repuestos
+          - button "Asignación de técnicos Planificado Personal" [ref=f14e235] [cursor=pointer]:
+            - generic [ref=f14e243]:
+              - generic [ref=f14e244]: Asignación de técnicos
+              - generic [ref=f14e245]: Planificado
+            - generic [ref=f14e247]: Personal
+          - button "Inteligencia de incidentes Planificado Incidentes" [ref=f14e248] [cursor=pointer]:
+            - generic [ref=f14e255]:
+              - generic [ref=f14e256]: Inteligencia de incidentes
+              - generic [ref=f14e257]: Planificado
+            - generic [ref=f14e259]: Incidentes
+          - generic [ref=f14e260]:
+            - generic [ref=f14e261]:
+              - generic [ref=f14e262]: Evaluación en curso
+              - generic [ref=f14e264]: LANGGRAPH
+            - img "Ilustración de un cerebro artificial formado por nodos y circuitos" [ref=f14e265]
+            - generic [ref=f14e306]:
+              - generic [ref=f14e307]:
+                - generic [ref=f14e308]: Evaluación determinista de flota
+                - generic [ref=f14e309]: Única capacidad de inteligencia operativa
+              - button "Ejecutar evaluación de flota" [disabled] [ref=f14e310]:
+                - generic [ref=f14e313]: Evaluando
+          - generic [ref=f14e314]:
+            - generic [ref=f14e325]:
+              - generic [ref=f14e326]: ESPECIALIDAD · Orquestación
+              - generic [ref=f14e327]: Coordinación
+              - paragraph [ref=f14e328]: Organiza el trabajo entre las capacidades del ecosistema.
+            - generic [ref=f14e329]: PLANIFICADO
+        - generic [ref=f14e330]: Las conexiones representan la arquitectura objetivo; no indican ejecuciones. Solo el workflow determinista central está implementado.
+      - generic [ref=f14e335]:
+        - generic [ref=f14e336]:
+          - generic [ref=f14e337]:
+            - generic [ref=f14e338]:
+              - generic [ref=f14e339]: LANGGRAPH / WORKFLOW 01
+              - heading "Evaluación de flota" [level=2] [ref=f14e340]
+              - paragraph [ref=f14e341]: Análisis determinista del estado de la flota
+            - button "Abrir centro de agentes" [ref=f14e342] [cursor=pointer]
+          - 'img "Flujo real: registros de flota pasan por assessFleet y producen recomendaciones estructuradas" [ref=f14e346]':
+            - generic [ref=f14e349]:
+              - generic [ref=f14e355]: ENTRADA
+              - generic [ref=f14e356]: Registros de flota
+              - generic [ref=f14e357]: Estado y lecturas actuales
+            - generic [ref=f14e358]:
+              - generic [ref=f14e363]: NODO LANGGRAPH
+              - generic [ref=f14e364]: assessFleet
+              - generic [ref=f14e365]: Evaluación de reglas
+            - generic [ref=f14e366]:
+              - generic [ref=f14e371]: SALIDA ESTRUCTURADA
+              - generic [ref=f14e372]: Recomendaciones
+              - generic [ref=f14e373]: Con evidencia
+            - generic [ref=f14e374]:
+              - generic [ref=f14e375]: estado
+              - generic [ref=f14e377]: temperatura
+              - generic [ref=f14e379]: vibración
+          - generic [ref=f14e381]:
+            - generic [ref=f14e386]:
+              - generic [ref=f14e387]: ÚLTIMA EJECUCIÓN
+              - generic [ref=f14e388]: Evaluando la flota…
+            - generic [ref=f14e389]: Solo esta sesión
+            - button "En ejecución" [disabled] [ref=f14e393]
+        - generic [ref=f14e394]:
+          - generic [ref=f14e395]:
+            - generic [ref=f14e396]:
+              - generic [ref=f14e397]: HALLAZGOS OPERACIONALES
+              - heading "Hallazgos con evidencia" [level=2] [ref=f14e398]
+            - button "Workflow" [ref=f14e399] [cursor=pointer]
+          - generic [ref=f14e402]:
+            - generic [ref=f14e405]: Esperando el resultado de inteligencia
+            - generic [ref=f14e406]: Las reglas revisan el estado, la temperatura y la vibración informados. No se agregan hallazgos sin datos que los respalden.
+          - generic [ref=f14e407]: ORIGEN · reglas deterministas
+      - generic [ref=f14e408]:
+        - generic [ref=f14e409]:
+          - generic [ref=f14e410]:
+            - generic [ref=f14e411]: TELEMETRÍA DE API / LECTURAS ACTUALES
+            - heading "Resumen de señales" [level=2] [ref=f14e412]
+            - paragraph [ref=f14e413]: Promedio de los registros cargados · no hay series históricas
+          - generic [ref=f14e414]: 0 / 0 cargadas
+        - generic [ref=f14e426]:
+          - generic [ref=f14e427]: i
+          - text: El contrato de origen no define unidades de telemetría. La cobertura indica registros con valor, no el estado del sensor.
+      - generic [ref=f14e428]:
+        - generic [ref=f14e429]:
+          - generic [ref=f14e430]:
+            - generic [ref=f14e431]: MAQUINARIA REGISTRADA
+            - heading "Vista rápida de la flota" [level=2] [ref=f14e432]
+          - button "Ver flota" [ref=f14e433] [cursor=pointer]
+        - generic [ref=f14e436]:
+          - table [ref=f14e437]:
+            - rowgroup [ref=f14e438]:
+              - row [ref=f14e439]:
+                - columnheader "MÁQUINA" [ref=f14e440]
+                - columnheader "CATEGORÍA" [ref=f14e441]
+                - columnheader "UBICACIÓN" [ref=f14e442]
+                - columnheader "ESTADO" [ref=f14e443]
+                - columnheader "HORAS" [ref=f14e444]
+                - columnheader "ACTUALIZACIÓN" [ref=f14e445]
+            - rowgroup
+          - generic [ref=f14e446]: Cargando registros de flota…
+      - generic [ref=f14e447]:
+        - generic [ref=f14e448]: ARQUIFUSION INTELIGENCIA OPERACIONAL
+        - generic [ref=f14e450]: DESARROLLO LOCAL · CONECTANDO

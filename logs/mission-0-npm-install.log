@@ -1,0 +1,9 @@
+﻿Mission 0 npm install result
+Timestamp: 2026-11-13T22:42:41.2798002-05:00
+Registry: https://registry.npmjs.org/
+Command: npm.cmd install --fetch-retries=0 --fetch-timeout=15000 --cache %TEMP%\hackcloud-npm-cache
+Result: FAILED (exit 1)
+Error: EACCES while fetching https://registry.npmjs.org/@aws-sdk%2fclient-dynamodb
+Diagnostics: registry DNS resolves; TCP 443 and HTTPS probe failed; npm ping also failed with EACCES.
+Detailed npm debug log: logs/mission-0-npm-install-debug.log
+No --force or --legacy-peer-deps used.

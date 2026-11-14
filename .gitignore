@@ -1,0 +1,10 @@
+node_modules/
+dist/
+*.tsbuildinfo
+.serverless/
+.env*
+!.env.example
+backend/data/*.json
+backend/data/uploads/*
+!backend/data/.gitkeep
+!backend/data/uploads/.gitkeep

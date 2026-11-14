@@ -1,0 +1,8 @@
+﻿Mission 0 npm diagnostics
+Timestamp: 2026-11-13T22:42:11.8369360-05:00
+Registry: https://registry.npmjs.org/
+DNS A: 104.16.8.34, 104.16.1.34, 104.16.11.34, 104.16.9.34, 104.16.10.34, 104.16.4.34, 104.16.0.34, 104.16.3.34, 104.16.2.34, 104.16.6.34, 104.16.5.34, 104.16.7.34
+TCP 443: False; remote address: 2606:4700::6810:122
+HTTPS probe: FAILED: WebException: No es posible conectar con el servidor remoto
+npm ping: failed, exit 1, EACCES connecting to https://registry.npmjs.org/-/ping; npm initially could not write its default cache log.
+npm ping retry used a cache under %TEMP% and did write its verbose debug log.
