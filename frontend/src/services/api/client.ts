@@ -52,6 +52,22 @@ export interface IngestionResult {
   rejected: Array<{ row: number; errors: string[] }>;
   originalFileUri: string;
 }
+export type TaskState = "PENDING" | "QUEUED" | "RUNNING" | "SUCCEEDED" | "RETRYING" | "FAILED" | "DEAD_LETTER";
+export interface AgentTask {
+  taskId: string; executionId: string; correlationId: string; taskType: "fleet.recommendations"; agentId: string;
+  createdAt: string; updatedAt: string; state: TaskState; attempts: number; maxAttempts: number;
+  result?: RecommendationResult; error?: { code: string; message: string; retryable: boolean };
+}
+export interface AgentEvent {
+  eventId: string; eventType: string; schemaVersion: "1.0"; timestamp: string; taskId: string;
+  executionId: string; correlationId: string; source: string; payload: Record<string, unknown>;
+}
+export interface OperationsOverview {
+  generatedAt: string; fleet: FleetMetrics;
+  agents: Array<{ id: string; name: string; specialty: string; status: "operational" | "planned" | "unavailable"; version: string; capabilities: string[] }>;
+  tasks: { total: number; pending: number; succeeded: number; failed: number; deadLetter: number };
+  recentEvents: AgentEvent[]; domains: { inventory: string; technicianAssignment: string; incidents: string };
+}
 
 const apiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
@@ -74,6 +90,10 @@ export const fleetApi = {
   machines: (query: URLSearchParams) => request<MachinePage>("/machines?" + query.toString()),
   machine: (id: string) => request<Machine>("/machines/" + encodeURIComponent(id)),
   recommendations: () => request<RecommendationResult>("/intelligence/recommendations"),
+  submitRecommendationTask: (idempotencyKey: string) => request<{ task: AgentTask; created: boolean }>("/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskType: "fleet.recommendations", idempotencyKey }) }),
+  task: (taskId: string) => request<AgentTask>("/tasks/" + encodeURIComponent(taskId)),
+  overview: () => request<OperationsOverview>("/operations/overview"),
+  events: () => request<AgentEvent[]>("/events"),
   ingest: (file: File) => request<IngestionResult>(
     "/ingest/" + (file.name.toLowerCase().endsWith(".csv") ? "csv" : "json"),
     { method: "POST", headers: { "content-type": file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "application/json" }, body: file },

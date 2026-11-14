@@ -4,12 +4,13 @@ import { FleetMetricsStrip } from "../../components/telemetry/FleetMetricsStrip"
 import { TelemetryPanel } from "../../components/telemetry/TelemetryPanel";
 import { WorkflowPanel } from "../../components/agents/WorkflowPanel";
 import { BrainEcosystem } from "../../components/agents/BrainEcosystem";
-import type { FleetMetrics, Machine, RecommendationResult } from "../../services/api/client";
+import type { FleetMetrics, Machine, OperationsOverview, RecommendationResult } from "../../services/api/client";
 import { MachineTable } from "../fleet/FleetView";
 
-export function CommandCenter({ metrics, machines, total, loading, result, intelligenceLoading, intelligenceError, onRun, onNavigate, onOpenMachine }: {
+export function CommandCenter({ metrics, machines, total, loading, result, intelligenceLoading, intelligenceError, overview, onRun, onNavigate, onOpenMachine }: {
   metrics: FleetMetrics | null; machines: Machine[]; total: number; loading: boolean;
   result: RecommendationResult | null; intelligenceLoading: boolean; intelligenceError?: string; onRun: () => void;
+  overview: OperationsOverview | null;
   onNavigate: (view: AppView) => void; onOpenMachine: (id: string) => void;
 }) {
   return <>
@@ -19,6 +20,10 @@ export function CommandCenter({ metrics, machines, total, loading, result, intel
       <WorkflowPanel result={result} loading={intelligenceLoading} onRun={onRun} onOpenAgents={() => onNavigate("agents")}/>
       <InsightsPanel result={result} onOpenMachine={onOpenMachine} onOpenAgents={() => onNavigate("agents")}/>
     </div>
+    {overview && <section className="panel supervisor-summary">
+      <div className="section-heading"><div><div className="eyebrow">SUPERVISIÓN</div><h2>Ejecuciones registradas</h2></div><button className="text-button" onClick={() => onNavigate("activity")}>Ver actividad</button></div>
+      <div className="supervisor-counts"><span><b>{overview.tasks.pending}</b>En proceso</span><span><b>{overview.tasks.succeeded}</b>Completadas</span><span><b>{overview.tasks.failed}</b>Fallidas</span><span><b>{overview.agents.filter((agent) => agent.status === "operational").length}</b>Capacidades operativas</span></div>
+    </section>}
     <TelemetryPanel machines={machines} total={total} loading={loading}/>
     <MachineTable machines={machines.slice(0, 6)} loading={loading} onOpen={onOpenMachine} title="Vista rápida de la flota" action={() => onNavigate("fleet")}/>
   </>;

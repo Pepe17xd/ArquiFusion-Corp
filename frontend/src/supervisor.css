@@ -1,0 +1,13 @@
+.supervisor-summary { margin: 0 0 12px; padding: 15px; }
+.supervisor-counts { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-top: 10px; }
+.supervisor-counts span { display: grid; gap: 5px; padding: 10px; background: #0b1114; border: 1px solid var(--line-soft); color: var(--muted); font-size: 9px; }
+.supervisor-counts b { color: var(--text); font-size: 19px; font-weight: 570; line-height: 1; }
+.event-rows { display: grid; margin: 12px 0; }
+.event-rows article { display: grid; grid-template-columns: 1.4fr 1.3fr .8fr .8fr .8fr 1fr; gap: 8px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); color: #a6b3b7; font-size: 9px; }
+.event-rows time { color: var(--muted); }
+.event-rows b { color: var(--ice); font-weight: 550; }
+.event-rows code { color: #9aa9ad; }
+@media (max-width: 600px) {
+  .supervisor-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .event-rows article { grid-template-columns: 1fr 1fr; }
+}

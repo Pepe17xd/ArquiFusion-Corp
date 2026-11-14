@@ -25,7 +25,7 @@ export function createLocalServer(services?: ApiServices): Server {
         rawQueryString: url.search.slice(1),
         headers: request.headers as Record<string, string>,
         queryStringParameters: Object.fromEntries(url.searchParams.entries()),
-        pathParameters: route.machineId ? { machineId: route.machineId } : undefined,
+        pathParameters: route.machineId ? { machineId: route.machineId } : route.taskId ? { taskId: route.taskId } : undefined,
         requestContext: {
           accountId: "local", apiId: "local", domainName: "localhost", domainPrefix: "localhost",
           http: { method: request.method ?? "GET", path: url.pathname, protocol: "HTTP/1.1", sourceIp: "127.0.0.1", userAgent: request.headers["user-agent"] ?? "local" },
@@ -60,7 +60,7 @@ async function readBody(request: IncomingMessage): Promise<string> {
 
 type HandlerSet = ReturnType<typeof createApiHandlers>;
 type LocalHandler = (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2>;
-function resolveRoute(method: string, pathname: string, handlers: HandlerSet): { handler: LocalHandler; machineId?: string } | undefined {
+function resolveRoute(method: string, pathname: string, handlers: HandlerSet): { handler: LocalHandler; machineId?: string; taskId?: string } | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (method === "GET" && path === "/health") return { handler: async () => handlers.health() };
   if (method === "POST" && path === "/ingest/csv") return { handler: handlers.ingestCsv as LocalHandler };
@@ -68,6 +68,13 @@ function resolveRoute(method: string, pathname: string, handlers: HandlerSet): {
   if (method === "GET" && path === "/machines") return { handler: handlers.listMachines as LocalHandler };
   if (method === "GET" && path === "/metrics") return { handler: async () => handlers.metrics() };
   if (method === "GET" && path === "/intelligence/recommendations") return { handler: async () => handlers.intelligence() };
+  if (method === "GET" && path === "/agents") return { handler: async () => handlers.agents() };
+  if (method === "POST" && path === "/tasks") return { handler: handlers.submitTask as LocalHandler };
+  if (method === "GET" && path === "/tasks") return { handler: async () => handlers.tasks() };
+  if (method === "GET" && path === "/events") return { handler: handlers.taskEvents as LocalHandler };
+  if (method === "GET" && path === "/operations/overview") return { handler: async () => handlers.operationsOverview() };
+  const taskMatch = /^\/tasks\/([^/]+)$/.exec(path);
+  if (method === "GET" && taskMatch) return { handler: handlers.getTask as LocalHandler, taskId: taskMatch[1] };
   const machineMatch = /^\/machines\/(.+)$/.exec(path);
   if (method === "GET" && machineMatch) return { handler: handlers.getMachine as LocalHandler, machineId: machineMatch[1] };
   return undefined;

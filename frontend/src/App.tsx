@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { fleetApi, type FleetMetrics, type Machine, type RecommendationResult } from "./services/api/client";
+import { fleetApi, type FleetMetrics, type Machine, type OperationsOverview, type RecommendationResult } from "./services/api/client";
 import { NavigationRail, type AppView } from "./components/navigation/NavigationRail";
 import { TopBar } from "./components/layout/TopBar";
 import { FeedbackBanner } from "./components/feedback/FeedbackBanner";
@@ -11,6 +11,7 @@ import { ActivityView } from "./features/operations/ActivityView";
 import { IngestionView } from "./features/ingestion/IngestionView";
 import { PlannedView } from "./features/planned/PlannedView";
 import "./style.css";
+import "./supervisor.css";
 
 const headings: Record<AppView, [string, string]> = {
   command: ["Centro de mando", "Estado de la flota, señales actuales e inteligencia operacional en una sola vista."],
@@ -27,6 +28,7 @@ const headings: Record<AppView, [string, string]> = {
 export default function App() {
   const [view, setView] = useState<AppView>("command");
   const [metrics, setMetrics] = useState<FleetMetrics | null>(null);
+  const [overview, setOverview] = useState<OperationsOverview | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
   const [nextCursor, setNextCursor] = useState<string>();
   const [cursorStack, setCursorStack] = useState<string[]>([]);
@@ -57,7 +59,7 @@ export default function App() {
     if (status) params.set("status", status);
     if (category) params.set("category", category);
     if (search) params.set("search", search);
-    const [health, page, totals] = await Promise.allSettled([fleetApi.health(), fleetApi.machines(params), fleetApi.metrics()]);
+    const [health, page, totals, operations] = await Promise.allSettled([fleetApi.health(), fleetApi.machines(params), fleetApi.metrics(), fleetApi.overview()]);
 
     if (health.status === "fulfilled") setConnected(health.value.status === "ok");
     else setConnected(false);
@@ -66,6 +68,8 @@ export default function App() {
     else { setMachines([]); setNextCursor(undefined); }
     if (totals.status === "fulfilled") setMetrics(totals.value);
     else setMetrics(null);
+    if (operations.status === "fulfilled") setOverview(operations.value);
+    else setOverview(null);
 
     const failure = page.status === "rejected" ? page.reason : totals.status === "rejected" ? totals.reason : health.status === "rejected" ? health.reason : undefined;
     if (failure) setError(failure instanceof Error ? failure.message : "No se pudieron cargar los datos de la API.");
@@ -77,7 +81,17 @@ export default function App() {
 
   const runIntelligence = useCallback(async () => {
     setIntelligenceLoading(true); setError(""); setIntelligenceError(""); setRecommendationResult(null);
-    try { setRecommendationResult(await fleetApi.recommendations()); }
+    try {
+      const submitted = await fleetApi.submitRecommendationTask(`dashboard-${crypto.randomUUID()}`);
+      let task = submitted.task;
+      for (let poll = 0; poll < 80 && !["SUCCEEDED", "FAILED", "DEAD_LETTER"].includes(task.state); poll += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 150));
+        task = await fleetApi.task(task.taskId);
+      }
+      if (task.state !== "SUCCEEDED" || !task.result) throw new Error(task.error?.message || "La ejecución no terminó correctamente.");
+      setRecommendationResult(task.result);
+      void fleetApi.overview().then(setOverview).catch(() => undefined);
+    }
     catch (reason) { const message = reason instanceof Error ? reason.message : "No se pudo ejecutar Intelligence."; setIntelligenceError(message); setError(message); }
     finally { setIntelligenceLoading(false); }
   }, []);
@@ -117,10 +131,10 @@ export default function App() {
       <main className="content-area">
         {(error || notice) && <FeedbackBanner kind={error ? "error" : "success"} onDismiss={() => { setError(""); setNotice(""); }}>{error || notice}</FeedbackBanner>}
         <div className="page-intro"><div><div className="eyebrow">ARQUIFUSION / OPERACIONES</div><h1>{headings[view][0]}</h1><p>{headings[view][1]}</p></div>{view !== "ingestion" && <span className="data-origin"><span className={`origin-led ${connected ? "online" : checking ? "checking" : "offline"}`}/>{connected ? "DATOS DE API" : checking ? "REVISANDO API" : "API SIN CONEXIÓN"}</span>}</div>
-        {view === "command" && <CommandCenter metrics={metrics} machines={machines} total={metrics?.total ?? 0} loading={loading} result={recommendationResult} intelligenceLoading={intelligenceLoading} intelligenceError={intelligenceError} onRun={runIntelligence} onNavigate={navigate} onOpenMachine={openMachine}/>}
+        {view === "command" && <CommandCenter metrics={metrics} machines={machines} total={metrics?.total ?? 0} loading={loading} result={recommendationResult} intelligenceLoading={intelligenceLoading} intelligenceError={intelligenceError} overview={overview} onRun={runIntelligence} onNavigate={navigate} onOpenMachine={openMachine}/>}
         {view === "fleet" && <FleetView machines={machines} metrics={metrics} loading={loading} search={searchInput} setSearch={setSearchInput} onSearch={submitSearch} status={status} setStatus={(value) => { setCursorStack([]); setStatus(value); }} category={category} setCategory={(value) => { setCursorStack([]); setCategory(value); }} cursorStack={cursorStack} nextCursor={nextCursor} setCursorStack={setCursorStack} onOpenMachine={openMachine}/>} 
         {view === "agents" && <AgentCommand result={recommendationResult} loading={intelligenceLoading} onRun={runIntelligence} onOpenMachine={openMachine}/>} 
-        {view === "activity" && <ActivityView/>}
+        {view === "activity" && <ActivityView overview={overview}/>}
         {view === "ingestion" && <IngestionView importing={importing} onFile={ingest}/>}
         {["maintenance", "inventory", "technicians", "incidents"].includes(view) && <PlannedView view={view} description={headings[view][1]}/>}
         <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>DESARROLLO LOCAL · <b>{connected ? "API CONECTADA" : checking ? "CONECTANDO" : "API SIN CONEXIÓN"}</b></span></footer>

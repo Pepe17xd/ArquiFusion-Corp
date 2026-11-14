@@ -8,3 +8,6 @@ backend/data/*.json
 backend/data/uploads/*
 !backend/data/.gitkeep
 !backend/data/uploads/.gitkeep
+__pycache__/
+*.py[cod]
+.pytest_cache/
