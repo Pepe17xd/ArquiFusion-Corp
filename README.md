@@ -143,3 +143,29 @@ Se retiraron dependencias iniciales sin uso en el código: serverless-http, ts-n
 - [LangGraph.js quickstart](https://docs.langchain.com/oss/javascript/langgraph/quickstart)
 - [Cloud Run overview](https://docs.cloud.google.com/run/docs/overview/what-is-cloud-run)
 - [Google Gen AI SDK](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/sdks/overview)
+
+## Supervisor y contratos políglotas (desarrollo local)
+
+El backend añade un supervisor que admite por ahora únicamente `fleet.recommendations`, encaminada a `LangGraphFleetIntelligence`. El supervisor valida la capacidad declarada, registra solicitud, asignación, inicio, resultado o fallo, admite clave de idempotencia, realiza hasta tres intentos con espera creciente y deja los fallos agotados en estado `DEAD_LETTER`. Las seis especialidades adicionales siguen marcadas como planificadas; no son agentes simulados.
+
+El adaptador `LocalTaskStore` persiste tareas y eventos en `backend/data/supervisor.json` (o en `SUPERVISOR_DATA_FILE`). Es un adaptador de desarrollo de un solo proceso y no ofrece garantías de cola distribuida, concurrencia multi instancia, recuperación de worker ni durabilidad de SQS/DynamoDB. No se declara que SQS, DLQ o Step Functions estén implementados en AWS.
+
+Los contratos portables viven en `shared/contracts/events.schema.json` y definen la envoltura v1 para eventos entre TypeScript y Python. El servicio Python de `services/intelligence/` valida esa envoltura y expone una base HTTP compatible con Cloud Run; `/health` informa `not-configured` y las solicitudes válidas de análisis responden `503 provider-not-configured`. No invoca Vertex AI ni Gemini y no produce resultados artificiales. El Dockerfile solo prepara el artefacto; no se construyó ni desplegó una imagen.
+
+### Rutas locales nuevas
+
+- `GET /agents`: manifiesto de capacidades implementadas y planificadas.
+- `POST /tasks` con `{"taskType":"fleet.recommendations","idempotencyKey":"..."}`: encola el workflow operativo local.
+- `GET /tasks` y `GET /tasks/{taskId}`: lista o consulta ejecuciones.
+- `GET /events?taskId=...`: eventos persistidos por el adaptador local.
+- `GET /operations/overview`: agrega métricas de flota, agentes, ejecuciones y actividad reciente disponible.
+
+Estas rutas todavía no están declaradas en `backend/serverless.yml`: la plantilla AWS existente solo publica las siete rutas HTTP originales y actualmente no tiene un repositorio duradero para tareas. La pantalla que depende del supervisor debe ejecutarse contra la API local. No se presenta la persistencia JSON como servicio AWS.
+
+El registro de capacidades limita qué workflow puede ejecutar el supervisor, pero la API del prototipo aún no autentica usuarios ni valida permisos del solicitante. La ruta Python tampoco verifica por sí misma identidad JWT: antes de exponerla en Cloud Run debe exigirse autenticación de servicio mediante IAM y probarse esa frontera.
+
+`GmailApiNotifier` prepara el envío por Gmail REST mediante un proveedor OAuth inyectado y el alcance mínimo `gmail.send`. Si no se inyecta un destinatario y proveedor de token protegidos, informa `pending` y no hace llamadas. No implementa todavía el flujo OAuth, almacenamiento de refresh tokens ni deduplicación durable; la deduplicación actual es por proceso, por lo que no se usa como envío operacional. AWS Secrets Manager, Gmail, Cloud Run y Google Cloud no se consultan ni configuran.
+
+`.env.example` contiene solo nombres de configuración y valores vacíos. `.gitignore` excluye `.env*` salvo ese ejemplo, el estado JSON local y artefactos Python. Las credenciales de OAuth o cloud deben agregarse posteriormente mediante almacenes protegidos; no se deben guardar en el repositorio.
+
+Comandos añadidos: `npm run test:python`, `npm run build:python` y `npm run dev:intelligence`. `npm test` y `npm run build` ejecutan los paquetes TypeScript y el chequeo Python local. `npm run infra:validate` sigue comprobando la definición existente sin llamadas AWS ni despliegues.
