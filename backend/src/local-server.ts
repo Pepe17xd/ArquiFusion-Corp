@@ -10,7 +10,7 @@ export function createLocalServer(services?: ApiServices): Server {
   return createServer(async (request, response) => {
     response.setHeader("access-control-allow-origin", "*");
     response.setHeader("access-control-allow-methods", allowedMethods);
-    response.setHeader("access-control-allow-headers", "content-type");
+    response.setHeader("access-control-allow-headers", "content-type,authorization,x-tenant-id");
     if (request.method === "OPTIONS") { response.writeHead(204).end(); return; }
 
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -66,13 +66,15 @@ function resolveRoute(method: string, pathname: string, handlers: HandlerSet): {
   if (method === "POST" && path === "/ingest/csv") return { handler: handlers.ingestCsv as LocalHandler };
   if (method === "POST" && path === "/ingest/json") return { handler: handlers.ingestJson as LocalHandler };
   if (method === "GET" && path === "/machines") return { handler: handlers.listMachines as LocalHandler };
-  if (method === "GET" && path === "/metrics") return { handler: async () => handlers.metrics() };
-  if (method === "GET" && path === "/intelligence/recommendations") return { handler: async () => handlers.intelligence() };
-  if (method === "GET" && path === "/agents") return { handler: async () => handlers.agents() };
+  if (method === "GET" && path === "/metrics") return { handler: handlers.metrics as LocalHandler };
+  if (method === "GET" && path === "/intelligence/recommendations") return { handler: handlers.intelligence as LocalHandler };
+  if (method === "GET" && path === "/agents") return { handler: handlers.agents as LocalHandler };
+  if (method === "GET" && path === "/tenants") return { handler: handlers.listTenants as LocalHandler };
+  if (method === "POST" && path === "/tenants") return { handler: handlers.createTenant as LocalHandler };
   if (method === "POST" && path === "/tasks") return { handler: handlers.submitTask as LocalHandler };
-  if (method === "GET" && path === "/tasks") return { handler: async () => handlers.tasks() };
+  if (method === "GET" && path === "/tasks") return { handler: handlers.tasks as LocalHandler };
   if (method === "GET" && path === "/events") return { handler: handlers.taskEvents as LocalHandler };
-  if (method === "GET" && path === "/operations/overview") return { handler: async () => handlers.operationsOverview() };
+  if (method === "GET" && path === "/operations/overview") return { handler: handlers.operationsOverview as LocalHandler };
   const taskMatch = /^\/tasks\/([^/]+)$/.exec(path);
   if (method === "GET" && taskMatch) return { handler: handlers.getTask as LocalHandler, taskId: taskMatch[1] };
   const machineMatch = /^\/machines\/(.+)$/.exec(path);

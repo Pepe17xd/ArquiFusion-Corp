@@ -7,14 +7,26 @@ provider:
   stage: ${opt:stage, 'dev'}
   httpApi:
     cors:
-      allowedOrigins: ['*']
-      allowedHeaders: [content-type]
+      allowedOrigins: ['${env:WEB_ORIGIN, "http://localhost:5173"}']
+      allowedHeaders: [content-type, authorization, x-tenant-id]
       allowedMethods: [GET, POST, OPTIONS]
+    authorizers:
+      cognito:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${env:COGNITO_ISSUER}
+        audience:
+          - ${env:COGNITO_AUDIENCE}
   environment:
     STORAGE_MODE: cloud
-    MACHINES_TABLE: ${self:service}-${sls:stage}-machines
+    AUTH_MODE: cognito
+    MACHINES_TABLE: ${self:service}-${sls:stage}-machines-v2
+    TENANTS_TABLE: ${self:service}-${sls:stage}-tenants
+    TASKS_TABLE: ${self:service}-${sls:stage}-tasks
     UPLOADS_BUCKET: ${self:service}-${sls:stage}-${env:AWS_ACCOUNT_ID}-imports
-  # Supply the existing LabRole ARN explicitly; the project never creates IAM roles.
+    COGNITO_ISSUER: ${env:COGNITO_ISSUER}
+    COGNITO_AUDIENCE: ${env:COGNITO_AUDIENCE}
+  # Supply the existing LabRole ARN explicitly; this project never creates IAM roles.
   iam:
     role: ${env:AWS_LAMBDA_ROLE_ARN}
 functions:
@@ -25,38 +37,130 @@ functions:
   ingestCsv:
     handler: dist/api/handlers.ingestCsv
     events:
-      - httpApi: {path: /ingest/csv, method: POST}
+      - httpApi: {path: /ingest/csv, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
   ingestJson:
     handler: dist/api/handlers.ingestJson
     events:
-      - httpApi: {path: /ingest/json, method: POST}
+      - httpApi: {path: /ingest/json, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
   listMachines:
     handler: dist/api/handlers.listMachines
     events:
-      - httpApi: {path: /machines, method: GET}
+      - httpApi: {path: /machines, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
   getMachine:
     handler: dist/api/handlers.getMachine
     events:
-      - httpApi: {path: '/machines/{machineId}', method: GET}
+      - httpApi: {path: '/machines/{machineId}', method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
   metrics:
     handler: dist/api/handlers.metrics
     events:
-      - httpApi: {path: /metrics, method: GET}
+      - httpApi: {path: /metrics, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
   intelligence:
     handler: dist/api/handlers.intelligence
     events:
-      - httpApi: {path: /intelligence/recommendations, method: GET}
+      - httpApi: {path: /intelligence/recommendations, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
+  agents:
+    handler: dist/api/handlers.agents
+    events:
+      - httpApi: {path: /agents, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
+  submitTask:
+    handler: dist/api/handlers.submitTask
+    environment:
+      TASK_STATE_MACHINE_ARN: arn:aws:states:${aws:region}:${env:AWS_ACCOUNT_ID}:stateMachine:${self:service}-${sls:stage}-fleet-recommendations
+    events:
+      - httpApi: {path: /tasks, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
+  tasks:
+    handler: dist/api/handlers.tasks
+    events:
+      - httpApi: {path: /tasks, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
+  getTask:
+    handler: dist/api/handlers.getTask
+    events:
+      - httpApi: {path: '/tasks/{taskId}', method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
+  taskEvents:
+    handler: dist/api/handlers.taskEvents
+    events:
+      - httpApi: {path: /events, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
+  operationsOverview:
+    handler: dist/api/handlers.operationsOverview
+    events:
+      - httpApi: {path: /operations/overview, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
+  listTenants:
+    handler: dist/api/handlers.listTenants
+    events:
+      - httpApi: {path: /tenants, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
+  createTenant:
+    handler: dist/api/handlers.createTenant
+    events:
+      - httpApi: {path: /tenants, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
+  runTask:
+    handler: dist/api/handlers.runTask
+    timeout: 300
+  markTaskDeadLetter:
+    handler: dist/api/handlers.markTaskDeadLetter
+    timeout: 30
 resources:
   Resources:
+    # Keep the old logical resource and schema in place; never replace its machineId-only table.
     MachinesTable:
       Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
       Properties:
-        TableName: ${self:provider.environment.MACHINES_TABLE}
+        TableName: ${self:service}-${sls:stage}-machines
         BillingMode: PAY_PER_REQUEST
         AttributeDefinitions: [{AttributeName: machineId, AttributeType: S}]
         KeySchema: [{AttributeName: machineId, KeyType: HASH}]
+    MachinesTableV2:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        TableName: ${self:provider.environment.MACHINES_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - {AttributeName: pk, AttributeType: S}
+          - {AttributeName: sk, AttributeType: S}
+        KeySchema:
+          - {AttributeName: pk, KeyType: HASH}
+          - {AttributeName: sk, KeyType: RANGE}
+    TenantsTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        TableName: ${self:provider.environment.TENANTS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - {AttributeName: pk, AttributeType: S}
+          - {AttributeName: sk, AttributeType: S}
+          - {AttributeName: gsi1pk, AttributeType: S}
+          - {AttributeName: gsi1sk, AttributeType: S}
+        KeySchema:
+          - {AttributeName: pk, KeyType: HASH}
+          - {AttributeName: sk, KeyType: RANGE}
+        GlobalSecondaryIndexes:
+          - IndexName: ByUser
+            KeySchema:
+              - {AttributeName: gsi1pk, KeyType: HASH}
+              - {AttributeName: gsi1sk, KeyType: RANGE}
+            Projection: {ProjectionType: ALL}
+    TasksTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        TableName: ${self:provider.environment.TASKS_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - {AttributeName: pk, AttributeType: S}
+          - {AttributeName: sk, AttributeType: S}
+        KeySchema:
+          - {AttributeName: pk, KeyType: HASH}
+          - {AttributeName: sk, KeyType: RANGE}
     UploadsBucket:
       Type: AWS::S3::Bucket
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
       Properties:
         BucketName: ${self:provider.environment.UPLOADS_BUCKET}
         PublicAccessBlockConfiguration:
@@ -67,3 +171,34 @@ resources:
         BucketEncryption:
           ServerSideEncryptionConfiguration:
             - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+    FleetRecommendationsStateMachine:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        StateMachineName: ${self:service}-${sls:stage}-fleet-recommendations
+        StateMachineType: STANDARD
+        RoleArn: ${env:AWS_STEP_FUNCTIONS_ROLE_ARN}
+        Definition:
+          StartAt: EjecutarWorkflow
+          States:
+            EjecutarWorkflow:
+              Type: Task
+              Resource: {Fn::GetAtt: [RunTaskLambdaFunction, Arn]}
+              Retry:
+                - ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException]
+                  IntervalSeconds: 2
+                  MaxAttempts: 2
+                  BackoffRate: 2
+              Catch:
+                - ErrorEquals: [States.ALL]
+                  ResultPath: $.workflowError
+                  Next: RegistrarFalloDurable
+              End: true
+            RegistrarFalloDurable:
+              Type: Task
+              Resource: {Fn::GetAtt: [MarkTaskDeadLetterLambdaFunction, Arn]}
+              Retry:
+                - ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException]
+                  IntervalSeconds: 2
+                  MaxAttempts: 2
+                  BackoffRate: 2
+              End: true

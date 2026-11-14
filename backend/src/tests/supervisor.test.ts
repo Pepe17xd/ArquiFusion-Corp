@@ -15,10 +15,10 @@ import { createLocalServer } from "../local-server";
 import { LocalOriginalFileStore } from "../storage/local-original-file-store";
 
 const tempRoot = resolve(__dirname, "../../data");
-const noMachines = () => new LocalMachineRepository(resolve("/tmp/arquifusion-empty-machines.json"));
+const noMachines = () => new LocalMachineRepository(resolve(tempRoot, ".test-empty-machines.json"));
 
 test("shared v1 event envelope validates and rejects unknown fields", () => {
-  const event = createEvent({ eventType: "AgentTaskRequested", taskId: "t", executionId: "x", correlationId: "c", payload: {} });
+  const event = createEvent({ eventType: "AgentTaskRequested", tenantId: "local-demo", taskId: "t", executionId: "x", correlationId: "c", payload: {} });
   assert.equal(validateEvent(event), true);
   assert.equal(validateEvent({ ...event, token: "not-allowed" }), false);
 });
@@ -39,8 +39,8 @@ test("supervisor refuses tasks outside the explicit capability registry", async 
   const dir = await mkdtemp(join(tempRoot, ".test-supervisor-capability-"));
   try {
     const supervisor = new AgentSupervisor(new LocalTaskStore(join(dir, "supervisor.json")), noMachines());
-    await assert.rejects(supervisor.submit({ taskType: "inventory.recommendations" }), PermanentTaskError);
-    assert.equal((await supervisor.list()).length, 0);
+    await assert.rejects(supervisor.submit({ tenantId: "local-demo", taskType: "inventory.recommendations" }), PermanentTaskError);
+    assert.equal((await supervisor.list("local-demo")).length, 0);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -51,16 +51,22 @@ test("supervisor persists, routes and deduplicates a supported task", async () =
     const provider: IntelligenceProvider = { recommend: async () => { runs += 1; return { generatedAt: new Date().toISOString(), recommendations: [], source: "deterministic-rules" }; } };
     const store = new LocalTaskStore(join(dir, "supervisor.json"));
     const supervisor = new AgentSupervisor(store, noMachines(), provider, async () => undefined);
-    const first = await supervisor.submit({ taskType: "fleet.recommendations", idempotencyKey: "same-request" });
-    const duplicate = await supervisor.submit({ taskType: "fleet.recommendations", idempotencyKey: "same-request" });
+    const first = await supervisor.submit({ tenantId: "local-demo", taskType: "fleet.recommendations", idempotencyKey: "same-request" });
+    const duplicate = await supervisor.submit({ tenantId: "local-demo", taskType: "fleet.recommendations", idempotencyKey: "same-request" });
     assert.equal(first.created, true);
     assert.equal(duplicate.created, false);
     assert.equal(first.task.taskId, duplicate.task.taskId);
     const completed = await waitForTerminal(supervisor, first.task.taskId);
     assert.equal(completed.state, "SUCCEEDED");
     assert.equal(runs, 1);
-    const eventLog = await supervisor.events(first.task.taskId);
+    const eventLog = await supervisor.events("local-demo", first.task.taskId);
     assert.deepEqual(eventLog.map((event) => event.eventType), ["AgentTaskRequested", "AgentTaskAssigned", "AgentTaskStarted", "AgentTaskCompleted"]);
+    const otherTenant = await supervisor.submit({ tenantId: "tenant-b", taskType: "fleet.recommendations", idempotencyKey: "same-request" });
+    assert.equal(otherTenant.created, true);
+    assert.notEqual(otherTenant.task.taskId, first.task.taskId);
+    await waitForTerminal(supervisor, otherTenant.task.taskId, "tenant-b");
+    assert.equal(runs, 2);
+    assert.equal(await supervisor.get("tenant-b", first.task.taskId), undefined);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -70,7 +76,7 @@ test("transient provider failures retry to the local dead-letter state", async (
     let runs = 0;
     const provider: IntelligenceProvider = { recommend: async () => { runs += 1; throw new Error("private provider detail"); } };
     const supervisor = new AgentSupervisor(new LocalTaskStore(join(dir, "supervisor.json")), noMachines(), provider, async () => undefined);
-    const submitted = await supervisor.submit({ taskType: "fleet.recommendations", idempotencyKey: "retry-request" });
+    const submitted = await supervisor.submit({ tenantId: "local-demo", taskType: "fleet.recommendations", idempotencyKey: "retry-request" });
     const task = await waitForTerminal(supervisor, submitted.task.taskId);
     assert.equal(task.state, "DEAD_LETTER");
     assert.equal(task.attempts, 3);
@@ -81,7 +87,7 @@ test("transient provider failures retry to the local dead-letter state", async (
 
 test("local API exposes agents, task submission, task status, events and consolidated overview", async () => {
   const dir = await mkdtemp(join(tempRoot, ".test-supervisor-api-"));
-  const server = createLocalServer({ machines: new LocalMachineRepository(join(dir, "machines.json")), originals: new LocalOriginalFileStore(join(dir, "uploads")), tasks: new LocalTaskStore(join(dir, "supervisor.json")) });
+  const server = createLocalServer({ machines: new LocalMachineRepository(join(dir, "machines.json")), originals: new LocalOriginalFileStore(join(dir, "uploads")), tasks: new LocalTaskStore(join(dir, "supervisor.json")), tenants: new (await import("../tenancy/local-tenant-directory")).LocalTenantDirectory(join(dir, "tenants.json")) });
   try {
     await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     const address = server.address();
@@ -108,11 +114,11 @@ test("local API exposes agents, task submission, task status, events and consoli
   }
 });
 
-async function waitForTerminal(supervisor: AgentSupervisor, taskId: string) {
-  for (let attempt = 0; attempt < 100; attempt += 1) {
-    const task = await supervisor.get(taskId);
+async function waitForTerminal(supervisor: AgentSupervisor, taskId: string, tenantId = "local-demo") {
+  for (let attempt = 0; attempt < 500; attempt += 1) {
+    const task = await supervisor.get(tenantId, taskId);
     if (task && ["SUCCEEDED", "FAILED", "DEAD_LETTER"].includes(task.state)) return task;
-    await new Promise((resolveWait) => setTimeout(resolveWait, 5));
+    await new Promise((resolveWait) => setTimeout(resolveWait, 10));
   }
   throw new Error("Task did not reach a terminal state");
 }

@@ -37,6 +37,6 @@ export function aggregateFleetMetrics(machines: Machine[]): FleetMetrics {
   return metrics;
 }
 
-export async function getFleetMetrics(repository: MachineRepository): Promise<FleetMetrics> {
-  return aggregateFleetMetrics(await collectAllMachines(repository));
+export async function getFleetMetrics(repository: MachineRepository, tenantId: string): Promise<FleetMetrics> {
+  return aggregateFleetMetrics(await collectAllMachines(repository, tenantId));
 }

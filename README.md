@@ -1,171 +1,146 @@
-# ArquiFusion Intelligence Foundation 2.0
+# ARQUIFUSION
 
-Base modular para operaciones de flota. La API Node.js/TypeScript funciona localmente sin credenciales; sus adaptadores cloud para DynamoDB y S3 se seleccionan con configuración. El frontend React consume la API y LangGraph ejecuta un flujo demostrativo de recomendaciones basadas en reglas reproducibles.
+Base SaaS multi-tenant para inteligencia operacional de flotas. El entorno local funciona sin cuentas cloud. El modo cloud declara autenticación Cognito, datos particionados por tenant, originales privados en S3 y workflows durables de recomendaciones con Step Functions.
 
-## Requisitos y ejecución local
+## Desarrollo local
 
-- Node.js 24 LTS y npm 10 o superior.
-- No se necesita cuenta cloud para desarrollar ni ejecutar las pruebas.
-
-Desde la raíz del workspace:
+Requisitos: Node.js 24 y npm 10 o superior. Python 3.11 o superior solo se necesita para probar o ejecutar `services/intelligence`.
 
 ~~~powershell
 npm ci
 npm test
 npm run build
+npm run infra:validate
 ~~~
 
-En dos terminales:
+En terminales separadas:
 
 ~~~powershell
 npm run dev:api
-~~~
-
-~~~powershell
 npm run dev:web
 ~~~
 
-La API local queda en http://localhost:3001; el dashboard en http://localhost:5173. Vite elimina el prefijo /api al reenviar las llamadas al backend. La persistencia y el archivo de datos local se encuentran en backend/data/; los originales se archivan en backend/data/uploads/. Define LOCAL_DATA_FILE o LOCAL_UPLOADS_DIR para cambiar esas rutas durante el desarrollo.
+La API local escucha en `http://127.0.0.1:3001`; Vite sirve el frontend en `http://localhost:5173` y reenvía `/api` a la API. `AUTH_MODE=local` (predeterminado) usa la identidad de desarrollo fija `local-dev-user` y el tenant `local-demo`. No acepta identidad ni tenant indicados en el cuerpo de una solicitud. Esta modalidad solo sirve para desarrollo; no es autenticación.
 
-La API incluye los dos registros de backend/data/machines.json que ya formaban parte del workspace como datos de ejemplo. No se generan lecturas nuevas. En una copia limpia, la flota empieza vacía.
+El estado local se guarda bajo `backend/data/`, que está excluido de Git:
+
+- `machines.json`: registros normalizados. Los archivos preexistentes sin `tenantId` se asignan al tenant fijo `local-demo` al leerlos.
+- `tenants.json`: organizaciones y membresías locales. La primera lectura inicializa el tenant `local-demo` en memoria; se persiste al crear otra organización.
+- `supervisor.json`: tareas y eventos locales.
+- `uploads/tenants/<tenantId>/imports/`: originales CSV/JSON direccionados por SHA-256 dentro del tenant.
+
+Puedes aislar una ejecución de desarrollo con `LOCAL_DATA_FILE`, `LOCAL_UPLOADS_DIR` y `SUPERVISOR_DATA_FILE`.
 
 ## Arquitectura
 
 ~~~mermaid
 flowchart LR
-  UI[React + TypeScript<br/>Dashboard] -->|HTTP JSON| API[API Gateway HTTP API]
-  UIlocal[React + Vite<br/>desarrollo] -->|proxy /api| LocalAPI[HTTP server local]
-  API --> L[Lambda handlers<br/>por responsabilidad]
-  L --> CORE[Core<br/>Machine, validaciones, errores]
-  L --> ING[Ingestion<br/>CSV / JSON, normalización]
-  L --> FLEET[Fleet<br/>detalle, filtros, paginación]
-  L --> MET[Metrics<br/>agregación completa]
-  L --> INT[Intelligence<br/>LangGraph]
-  ING --> STORE[Storage interfaces]
-  FLEET --> STORE
-  MET --> STORE
-  INT --> STORE
-  STORE --> LOCAL[Adaptadores locales<br/>JSON + archivos]
-  STORE --> DDB[(DynamoDB)]
-  STORE --> S3[(S3 privado<br/>originales por SHA-256)]
-  INT -. futuro proveedor IA .-> GCP[Google Cloud Run<br/>Vertex AI / Gemini]
-  ING -. futuro workflow durable .-> SF[AWS Step Functions]
+  Web[React + TypeScript<br/>sesión PKCE en navegador] -->|JWT + X-Tenant-Id| Gateway[API Gateway HTTP API<br/>authorizer Cognito]
+  Web -->|proxy /api| Local[API HTTP local<br/>identidad fija de desarrollo]
+  Gateway --> Lambda[Handlers Lambda por ruta]
+  Local --> Lambda
+  Lambda --> Core[Core / Fleet / Ingestion / Metrics]
+  Lambda --> Auth[Directorio de tenants]
+  Auth --> LocalTenant[JSON local]
+  Auth --> TenantDB[(DynamoDB<br/>organizaciones + membresías)]
+  Core --> MachineDB[(DynamoDB v2<br/>pk=tenantId, sk=machineId)]
+  Core --> Files[S3 privado<br/>tenants/{tenantId}/imports]
+  Lambda --> Tasks[Supervisor + contrato de tareas]
+  Tasks --> LocalTasks[JSON local + ejecución local]
+  Tasks --> TaskDB[(DynamoDB<br/>tareas + idempotencia + eventos)]
+  Tasks -->|StartExecution| SFN[AWS Step Functions Standard]
+  SFN --> Worker[Lambda workflow]
+  Worker --> Intelligence[LangGraph determinista]
+  Python[Servicio Python HTTP] -. preparado, no integrado .-> GCP[Cloud Run / Vertex AI]
 ~~~
 
-### Módulos
+### Límites del código
 
-~~~text
-backend/
-  src/
-    core/          modelos, validación, configuración y errores compartidos
-    domain/        punto de entrada compatible con el dominio existente
-    storage/       contratos y adaptadores local, DynamoDB y S3
-    ingestion/     parseo, normalización compartida, archivo e upsert
-    fleet/         filtros, paginación y consulta de máquinas
-    metrics/       agregaciones sobre toda la flota
-    intelligence/  contrato de proveedor y workflow LangGraph aislado
-    api/           adaptadores HTTP y handlers Lambda
-    tests/         pruebas unitarias e integración local
-  serverless.yml definición de API Gateway, Lambdas, DynamoDB y S3
-  scripts/       validación estructural de infraestructura
-frontend/
-  src/api.ts      cliente HTTP y contratos del frontend
-  src/main.tsx    navegación, dashboard y componentes
-  src/style.css   sistema visual adaptable
-~~~
+- `backend/src/core`: modelo Machine, normalización, configuración y errores compartidos.
+- `backend/src/tenancy`: contratos de tenant e implementación JSON local y DynamoDB. La identidad cloud proviene del claim `sub` que API Gateway valida; `X-Tenant-Id` selecciona una membresía y no concede acceso por sí mismo.
+- `backend/src/storage`: contratos y adaptadores local/DynamoDB/S3, además de escritura atómica local compatible con Windows.
+- `backend/src/ingestion`: CSV/JSON, normalización compartida, validación por fila, SHA-256, archivo del original y upsert tenant-scoped.
+- `backend/src/fleet` y `metrics`: listado, detalle, filtros, cursores y agregaciones sobre todas las páginas de un tenant.
+- `backend/src/intelligence`: LangGraph permanece aislado y ejecuta reglas deterministas; no llama un modelo externo.
+- `backend/src/supervisor`: capacidades registradas, tareas/eventos tenant-scoped, deduplicación por tenant, adaptador local y adaptador DynamoDB; `StepFunctionsTaskDispatcher` inicia el workflow durable cloud.
+- `backend/src/api`: adaptadores HTTP para servidor local y Lambda. `health` es público; rutas de negocio requieren membresía y API Gateway aplica scopes Cognito en cloud.
+- `services/intelligence`: contrato compartido y servidor Python. Todavía no consulta Vertex AI/Gemini ni está conectado al backend TypeScript.
+- `frontend/src`: SPA React, cliente HTTP, PKCE Hosted UI para cloud, selector de organización y vistas operativas. En local usa el proxy Vite y no guarda una identidad real.
+- `shared/contracts/events.schema.json`: envoltura de eventos v1 validada por TypeScript y Python.
 
-## Capacidades y contratos HTTP
+Los contextos TypeScript están separados por responsabilidad, pero todavía se empaquetan como un único workspace backend y una API. No se declaran microservicios independientes para dominios aún no operativos.
 
-Todas las respuestas de la API están dentro de { "data": ... }; los errores usan { "data": { "error": "...", "details": [...] } }.
+### Tenant y persistencia
 
-- GET /health
-- POST /ingest/csv con cuerpo text/csv
-- POST /ingest/json con un objeto Machine o un arreglo JSON
-- GET /machines?limit=20&cursor=...&status=operational&category=...&search=...
-- GET /machines/{machineId}
-- GET /metrics
-- GET /intelligence/recommendations
+La identidad verificada se obtiene del `sub` de Cognito; el backend consulta la membresía de ese usuario. Una solicitud no puede asignar su propio `tenantId` desde un objeto importado. Las máquinas usan la clave compuesta `pk=<tenantId>`, `sk=<machineId>` y las consultas filtran por esa partición. Los cursores DynamoDB conservan la clave completa y se rechazan si su `pk` no coincide con el tenant activo. Los originales usan el prefijo `tenants/<tenantId>/imports/`.
 
-La importación acepta archivos de hasta 8 MB. CSV y JSON comparten normalizeMachine; cada fila se valida por separado y los errores devuelven el índice de fila. Los registros válidos hacen upsert por machineId. El original CSV o JSON se archiva con una clave SHA-256 estable para que reimportarlo no cree otro objeto.
+Las tareas de cloud guardan el registro, el marcador de idempotencia y el evento inicial en una transacción DynamoDB. El índice de idempotencia se calcula con SHA-256 y queda bajo la partición del tenant. Step Functions Standard ejecuta el worker; los fallos agotados se registran como `DEAD_LETTER`. En local, el supervisor usa un archivo JSON de un solo proceso y cola en memoria, por lo que no ofrece recuperación distribuida.
 
-El listado usa cursores opacos. El adaptador DynamoDB conserva el LastEvaluatedKey completo y aplica filtros en Scan; un resultado de página puede tener menos elementos que el límite cuando los filtros descartan filas. Metrics continúa recorriendo hasta terminar las páginas. Las métricas incluyen distribución por estado y categoría, disponibilidad definida como operational / total, y agregados de los campos de telemetría presentes. No se les asigna una unidad de combustible porque el contrato de origen no la define.
+La tabla DynamoDB v2 es nueva (`*-machines-v2`); se conserva en el template el recurso lógico y esquema anteriores (`*-machines`) con `Retain`, evitando su reemplazo o eliminación. No hay migración automática de una tabla cloud existente porque sus filas no prueban a qué organización pertenecen. Una migración requiere aprobar el tenant propietario de cada conjunto y copiar los datos de forma explícita.
 
-Las reglas actuales de Intelligence usan estado registrado, temperatura de 90 o más y vibración de 5 o más como señales demostrativas. No son umbrales aprobados por el fabricante ni un diagnóstico predictivo certificado: deben configurarse con manuales y líneas base de cada modelo antes de usarlas en una operación real. El resultado incluye prioridad, motivo, acción sugerida y evidencia. No llama a un modelo externo y no necesita credenciales. LangGraph coordina el flujo; el contrato IntelligenceProvider permite incorporar después un servicio de Cloud Run y Vertex AI/Gemini.
+## Autenticación Cognito y modo cloud
 
-## Persistencia e infraestructura
+`backend/infrastructure/cognito.yml` declara User Pool, autoservicio de registro, cliente web público sin secreto, Hosted UI y scopes `arquifusion/read` / `arquifusion/write`. El frontend implementa authorization-code con PKCE, `state`, renovación de access token y almacenamiento de sesión en `sessionStorage`. No se incluyen client secrets en el navegador.
 
-STORAGE_MODE acepta local (predeterminado) o cloud. En modo cloud hacen falta MACHINES_TABLE y UPLOADS_BUCKET. El adaptador DynamoDB implementa get, upsert y scan paginado; S3 conserva originales con clave estable, cifrado SSE-S3 y escritura solo bajo imports/. El bucket bloquea el acceso público y configura cifrado. Los clientes AWS usan la cadena estándar de credenciales del SDK; la aplicación no contiene credenciales.
+Secuencia de configuración cloud (no ejecutada por este proyecto):
 
-backend/serverless.yml declara HTTP API, Lambdas separadas por ruta, runtime nodejs24.x, tabla on-demand y bucket. El rol de Lambda debe ser un rol existente y se especifica mediante AWS_LAMBDA_ROLE_ARN; en Learner Lab puede ser LabRole si su ARN y trust policy lo permiten. El proyecto no crea roles ni políticas. El rol seleccionado debe tener permisos de ejecución/logs, dynamodb:GetItem, dynamodb:PutItem y dynamodb:Scan sobre la tabla, además de s3:PutObject solo bajo imports/. No se verificaron esos permisos en una cuenta real.
+1. Revisar que el laboratorio AWS permita Cognito, DynamoDB, S3, API Gateway y Step Functions.
+2. Desplegar el template de Cognito por un operador autorizado y obtener `IssuerUrl`, `WebClientId` y `HostedUiUrl` de sus outputs.
+3. Configurar para Serverless `COGNITO_ISSUER`, `COGNITO_AUDIENCE`, `AWS_ACCOUNT_ID`, `AWS_LAMBDA_ROLE_ARN` y `AWS_STEP_FUNCTIONS_ROLE_ARN`; el origen web puede configurarse con `WEB_ORIGIN`.
+4. Publicar el frontend con `VITE_AUTH_MODE=cognito`, `VITE_API_URL` (URL de API Gateway), `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_REDIRECT_URI`.
+5. Desplegar infraestructura solo después de revisar permisos, región, costes, datos y migración.
 
-Para validar la plantilla sin desplegar:
+Las Lambdas usan el ARN de rol existente indicado por `AWS_LAMBDA_ROLE_ARN`; la plantilla no crea roles IAM. Ese rol necesita acceso limitado a las tablas de máquinas, tenants y tareas; `s3:PutObject` para originales; `states:StartExecution` sobre el state machine. El rol de ejecución preexistente de Step Functions debe poder invocar solo los dos handlers de workflow. AWS Academy puede limitar la creación de User Pools, state machines o recursos administrados aunque el YAML sea válido; el proyecto no inspecciona perfiles ni permisos de una cuenta.
+
+Validación estática, sin resolver credenciales, contactar AWS ni desplegar:
 
 ~~~powershell
 npm run infra:validate
 ~~~
 
-La validación analiza el YAML, handlers y recursos sin resolver variables ni llamar AWS. Antes de desplegar, configura AWS_ACCOUNT_ID y AWS_LAMBDA_ROLE_ARN; comprueba que región y servicios estén habilitados por el Learner Lab y revisa los permisos del rol existente en el portal. No se ejecutó ningún despliegue ni comprobación de permisos cloud. Serverless Framework 4 requiere una licencia para ejecutar su CLI; por esa limitación el comando local valida la estructura declarada, no el empaquetado integral del Framework.
+Este comando compila el backend y comprueba YAML, handlers, rutas protegidas, tablas, recursos de Cognito y workflow Standard. No sustituye una validación de permisos, empaquetado o despliegue en una cuenta.
 
-La región predeterminada es us-east-1, que debe confirmarse contra las restricciones del Learner Lab concreto. AWS Academy cambia las capacidades y regiones habilitadas según laboratorio/curso; no asumas que un permiso declarado localmente está concedido en la cuenta. El runtime Node.js 24 está soportado por Lambda según la tabla vigente de AWS.
+## Integración Google Cloud
 
-### Evolución cloud
+El servicio Python ofrece `/health` y valida el envelope de eventos. Para análisis válido aún responde `503 provider-not-configured`. No hay cliente Vertex AI/Gemini, servicio Cloud Run desplegado, llamadas desde TypeScript ni identidad entre AWS y Google. La evolución debe usar autenticación de servicio de Cloud Run con identidad dedicada y tokens OIDC de corta duración, límites de tiempo y minimización de los datos compartidos; nunca claves estáticas en el frontend.
 
-- Mantén DynamoDB como almacenamiento operacional. La tabla actual usa machineId como partition key y no tiene GSIs; filtros usan Scan y por ello no escalan como consultas indexadas. Cuando haya requisitos de consulta y cardinalidad definidos, agrega índices y acceso Query con migración documentada.
-- Usa Step Functions Standard para procesos que necesiten varios pasos durables, espera, reintentos o auditoría. El endpoint actual procesa cargas pequeñas de forma síncrona; aún no necesita una máquina de estados ni una role de servicio adicional.
-- Cloud Run es un límite futuro para ejecutar un proveedor de IA independiente. Vertex AI/Gemini se integra detrás de IntelligenceProvider; este repositorio no incorpora SDK, credenciales ni despliegues GCP aún.
+## Contratos HTTP principales
 
-## Decisiones y limitaciones actuales
+Las respuestas usan el envelope `{ "data": ... }`; los errores usan `{ "data": { "error": ..., "details": [...] } }`.
 
-- Node.js 24 LTS coincide con el runtime Lambda configurado. Vite 8 y su plugin React 6 son las versiones actuales compatibles con el runtime de desarrollo Node 24.
-- Los adaptadores local y cloud cumplen los mismos contratos. El almacenamiento local es un archivo de desarrollo: no ofrece concurrencia multi-proceso, transacciones ni las garantías de DynamoDB.
-- El dashboard incluye navegación funcional, filtros, paginación, estado vacío, carga y error. El detalle y las recomendaciones consultan endpoints dedicados.
-- No hay autenticación ni autorización de usuarios. CORS está abierto para el prototipo; debe restringirse al origen del frontend antes de publicar.
-- La integración entre backend AWS y el proveedor IA GCP no está desplegada. Si se incorpora, hay que definir identidad entre nubes, tiempos de espera, límites, costes y tratamiento de datos.
-- Step Functions no forma parte del despliegue actual. Su definición se añadirá cuando exista un workflow durable y probado.
+- `GET /health` — público.
+- `GET /tenants`, `POST /tenants` — membresías propias y creación de organización con el usuario autenticado como propietario.
+- `POST /ingest/csv`, `POST /ingest/json` — requiere rol `operator` o superior.
+- `GET /machines`, `GET /machines/{machineId}`, `GET /metrics`, `GET /intelligence/recommendations`.
+- `GET /agents`, `POST /tasks`, `GET /tasks`, `GET /tasks/{taskId}`, `GET /events`, `GET /operations/overview`.
 
-### Dependencias principales
+La API acepta CSV/JSON de hasta 8 MB. Los campos `tenantId` enviados en los registros se ignoran: el servicio los deriva del contexto autenticado. Las recomendaciones son reglas demostrativas sobre estado, temperatura y vibración; no equivalen a un diagnóstico certificado ni a un modelo predictivo industrial.
 
-- AWS SDK for JavaScript v3: adaptadores DynamoDB y S3.
-- LangGraph: ejecución del workflow determinista dentro de Intelligence.
-- csv-parse: lectura robusta de CSV con cabeceras y campos entrecomillados.
-- yaml: comprobación estructural local de la infraestructura declarada.
-- Serverless Framework: infraestructura AWS. El desarrollo local usa el servidor HTTP propio para no depender de una licencia del Framework.
-- Vite y plugin React: servidor y build del dashboard.
+## Capacidades y límites pendientes
 
-Se retiraron dependencias iniciales sin uso en el código: serverless-http, ts-node, Serverless Offline y Tailwind/PostCSS. El lockfile fija las versiones exactas instaladas por npm ci.
+- Solo `fleet.recommendations` tiene un workflow real. Las demás entradas del registro de agentes siguen planificadas; no son agentes autónomos.
+- Step Functions da durabilidad a la ejecución cloud, mientras que el worker actual realiza hasta tres intentos de proveedor dentro de una invocación Lambda. No existe SQS ni una DLQ SQS; `DEAD_LETTER` es el estado persistido de la tarea.
+- El listado de tareas/eventos actualmente recupera el conjunto completo de una partición. Para historiales grandes hace falta introducir cursores y retención antes de operación a escala.
+- El directorio permite que un usuario cree organizaciones y asigna `owner`; todavía no existen invitaciones, altas de miembros, gestión administrativa ni recuperación de membresías.
+- La UI de tenancy permite elegir una organización existente o crear una nueva. El onboarding multiusuario debe completarse cuando exista el proceso de invitación.
+- Cognito, AWS, Google Cloud y OAuth real no se han desplegado ni validado con una cuenta.
+- Cloud Run/Vertex AI, notificaciones Gmail, inventario, técnicos, mantenimiento y gestión de incidentes no están integrados como capacidades operacionales.
 
-## Documentación oficial consultada
+## Dependencias incorporadas
 
-- [Node.js release schedule](https://nodejs.org/en/about/previous-releases)
-- [AWS Lambda Node.js runtimes](https://docs.aws.amazon.com/lambda/latest/dg/lambda-nodejs.html)
-- [DynamoDB Scan y paginación](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Scan.html)
-- [Step Functions: elegir Standard o Express](https://docs.aws.amazon.com/step-functions/latest/dg/choosing-workflow-type.html)
-- [LangGraph.js quickstart](https://docs.langchain.com/oss/javascript/langgraph/quickstart)
-- [Cloud Run overview](https://docs.cloud.google.com/run/docs/overview/what-is-cloud-run)
-- [Google Gen AI SDK](https://docs.cloud.google.com/gemini-enterprise-agent-platform/models/sdks/overview)
+- `@aws-sdk/client-sfn` (`3.1169.0`): `StartExecution` para despachar tareas al workflow Standard en AWS.
+- `csv-parse` (`7.0.3`): parser de registros CSV; se actualizó desde 5.6.0 porque las versiones anteriores a 7.0.2 están afectadas por una vulnerabilidad de reemplazo de prototipo en la opción `columns`. La prueba de regresión de encabezados `__proto__` pasa en la versión fijada.
 
-## Supervisor y contratos políglotas (desarrollo local)
+`npm audit` informa cero vulnerabilidades conocidas al validar este cambio.
 
-El backend añade un supervisor que admite por ahora únicamente `fleet.recommendations`, encaminada a `LangGraphFleetIntelligence`. El supervisor valida la capacidad declarada, registra solicitud, asignación, inicio, resultado o fallo, admite clave de idempotencia, realiza hasta tres intentos con espera creciente y deja los fallos agotados en estado `DEAD_LETTER`. Las seis especialidades adicionales siguen marcadas como planificadas; no son agentes simulados.
+## Decisiones y seguridad
 
-El adaptador `LocalTaskStore` persiste tareas y eventos en `backend/data/supervisor.json` (o en `SUPERVISOR_DATA_FILE`). Es un adaptador de desarrollo de un solo proceso y no ofrece garantías de cola distribuida, concurrencia multi instancia, recuperación de worker ni durabilidad de SQS/DynamoDB. No se declara que SQS, DLQ o Step Functions estén implementados en AWS.
+- No hay fallback de cloud a identidad local: `STORAGE_MODE=cloud` exige Cognito.
+- API Gateway valida JWT, issuer, audience y scopes; las recomendaciones de seguridad multi-tenant de AWS también requieren validar membresías y aislar los datos dentro de la aplicación. Véanse [JWT authorizers de HTTP API](https://docs.aws.amazon.com/apigateway/latest/developerguide/http-api-jwt-authorizer.html) y [recomendaciones de Cognito multi-tenant](https://docs.aws.amazon.com/cognito/latest/developerguide/multi-tenancy-security-recommendations.html).
+- Las particiones DynamoDB siguen el patrón tenant partition key; el diseño de claves deberá revisarse ante cardinalidad alta o tenants muy activos. [Estrategias multi-tenant para DynamoDB](https://docs.aws.amazon.com/whitepapers/latest/multi-tenant-saas-storage-strategies/multitenancy-on-dynamodb.html).
+- El servicio entre nubes aún no está conectado; para una futura llamada autenticada, Google recomienda una identidad de servicio específica y un ID token OIDC para Cloud Run. [Autenticación servicio a servicio de Cloud Run](https://docs.cloud.google.com/run/docs/authenticating/service-to-service).
+- La configuración de Serverless usa un rol ya existente, como LabRole cuando el laboratorio lo permita; no se crean roles ni políticas. [Roles IAM en Serverless Framework](https://www.serverless.com/framework/docs/providers/aws/guide/iam).
 
-Los contratos portables viven en `shared/contracts/events.schema.json` y definen la envoltura v1 para eventos entre TypeScript y Python. El servicio Python de `services/intelligence/` valida esa envoltura y expone una base HTTP compatible con Cloud Run; `/health` informa `not-configured` y las solicitudes válidas de análisis responden `503 provider-not-configured`. No invoca Vertex AI ni Gemini y no produce resultados artificiales. El Dockerfile solo prepara el artefacto; no se construyó ni desplegó una imagen.
+## Licencia
 
-### Rutas locales nuevas
-
-- `GET /agents`: manifiesto de capacidades implementadas y planificadas.
-- `POST /tasks` con `{"taskType":"fleet.recommendations","idempotencyKey":"..."}`: encola el workflow operativo local.
-- `GET /tasks` y `GET /tasks/{taskId}`: lista o consulta ejecuciones.
-- `GET /events?taskId=...`: eventos persistidos por el adaptador local.
-- `GET /operations/overview`: agrega métricas de flota, agentes, ejecuciones y actividad reciente disponible.
-
-Estas rutas todavía no están declaradas en `backend/serverless.yml`: la plantilla AWS existente solo publica las siete rutas HTTP originales y actualmente no tiene un repositorio duradero para tareas. La pantalla que depende del supervisor debe ejecutarse contra la API local. No se presenta la persistencia JSON como servicio AWS.
-
-El registro de capacidades limita qué workflow puede ejecutar el supervisor, pero la API del prototipo aún no autentica usuarios ni valida permisos del solicitante. La ruta Python tampoco verifica por sí misma identidad JWT: antes de exponerla en Cloud Run debe exigirse autenticación de servicio mediante IAM y probarse esa frontera.
-
-`GmailApiNotifier` prepara el envío por Gmail REST mediante un proveedor OAuth inyectado y el alcance mínimo `gmail.send`. Si no se inyecta un destinatario y proveedor de token protegidos, informa `pending` y no hace llamadas. No implementa todavía el flujo OAuth, almacenamiento de refresh tokens ni deduplicación durable; la deduplicación actual es por proceso, por lo que no se usa como envío operacional. AWS Secrets Manager, Gmail, Cloud Run y Google Cloud no se consultan ni configuran.
-
-`.env.example` contiene solo nombres de configuración y valores vacíos. `.gitignore` excluye `.env*` salvo ese ejemplo, el estado JSON local y artefactos Python. Las credenciales de OAuth o cloud deben agregarse posteriormente mediante almacenes protegidos; no se deben guardar en el repositorio.
-
-Comandos añadidos: `npm run test:python`, `npm run build:python` y `npm run dev:intelligence`. `npm test` y `npm run build` ejecutan los paquetes TypeScript y el chequeo Python local. `npm run infra:validate` sigue comprobando la definición existente sin llamadas AWS ni despliegues.
+Este proyecto usa la licencia MIT; consulta [LICENSE](LICENSE).

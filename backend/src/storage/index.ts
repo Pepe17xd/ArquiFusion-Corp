@@ -1,9 +1,14 @@
 import { loadConfig } from "../core/config";
+import { dirname, join } from "node:path";
 import type { MachineRepository, OriginalFileStore } from "./contracts";
 import { LocalMachineRepository } from "./local-machine-repository";
 import { DynamoMachineRepository } from "./dynamo-machine-repository";
 import { LocalOriginalFileStore } from "./local-original-file-store";
 import { S3OriginalFileStore } from "./s3-original-file-store";
+import { LocalTenantDirectory } from "../tenancy/local-tenant-directory";
+import { DynamoTenantDirectory } from "../tenancy/dynamo-tenant-directory";
+import { DynamoTaskStore } from "../supervisor/dynamo-task-store";
+import { StepFunctionsTaskDispatcher } from "../supervisor/step-functions-dispatcher";
 
 export function createStorage() {
   const config = loadConfig();
@@ -13,5 +18,10 @@ export function createStorage() {
   const originals: OriginalFileStore = config.storageMode === "cloud"
     ? new S3OriginalFileStore(config.uploadsBucket!)
     : new LocalOriginalFileStore(config.localUploadsDir);
-  return { machines, originals };
+  const tenants = config.storageMode === "cloud"
+    ? new DynamoTenantDirectory(config.tenantsTable!)
+    : new LocalTenantDirectory(join(dirname(config.localDataFile), "tenants.json"));
+  const tasks = config.storageMode === "cloud" ? new DynamoTaskStore(config.tasksTable!) : undefined;
+  const dispatcher = config.storageMode === "cloud" && config.taskStateMachineArn ? new StepFunctionsTaskDispatcher(config.taskStateMachineArn) : undefined;
+  return { machines, originals, tenants, authMode: config.authMode, storageMode: config.storageMode, tasks, dispatcher };
 }

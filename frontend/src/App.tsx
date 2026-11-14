@@ -10,6 +10,7 @@ import { AgentCommand } from "./features/intelligence/AgentCommand";
 import { ActivityView } from "./features/operations/ActivityView";
 import { IngestionView } from "./features/ingestion/IngestionView";
 import { PlannedView } from "./features/planned/PlannedView";
+import { authMode, signOut } from "./services/auth/session";
 import "./style.css";
 import "./supervisor.css";
 
@@ -137,7 +138,7 @@ export default function App() {
         {view === "activity" && <ActivityView overview={overview}/>}
         {view === "ingestion" && <IngestionView importing={importing} onFile={ingest}/>}
         {["maintenance", "inventory", "technicians", "incidents"].includes(view) && <PlannedView view={view} description={headings[view][1]}/>}
-        <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>DESARROLLO LOCAL · <b>{connected ? "API CONECTADA" : checking ? "CONECTANDO" : "API SIN CONEXIÓN"}</b></span></footer>
+        <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>{authMode === "local" ? "ENTORNO LOCAL SIMULADO" : <button className="auth-link" onClick={signOut}>Cerrar sesión</button>} · <b>{connected ? "API CONECTADA" : checking ? "CONECTANDO" : "API SIN CONEXIÓN"}</b></span></footer>
       </main>
     </div>
     {selectedMachine && <MachineDialog machine={selectedMachine} onClose={() => setSelectedMachine(null)}/>}

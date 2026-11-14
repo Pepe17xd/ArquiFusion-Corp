@@ -20,7 +20,7 @@ def validate_event(value: Any) -> list[str]:
     errors: list[str] = []
     if set(value) != set(REQUIRED):
         errors.append("event fields do not match the v1 schema")
-    for field in ("eventId", "taskId", "executionId", "correlationId", "source"):
+    for field in ("eventId", "tenantId", "taskId", "executionId", "correlationId", "source"):
         if not isinstance(value.get(field), str) or not value[field].strip():
             errors.append(f"{field} must be a non-empty string")
     if value.get("eventType") not in EVENT_TYPES:

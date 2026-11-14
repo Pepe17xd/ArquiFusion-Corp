@@ -3,6 +3,7 @@ export type MachineStatus = (typeof MACHINE_STATUSES)[number];
 export type IngestionSource = "csv" | "json";
 
 export interface Machine {
+  tenantId: string;
   machineId: string;
   model: string;
   category: string;
@@ -33,7 +34,8 @@ export class ValidationError extends Error {
 const requiredFields = ["machineId", "model", "category", "location"] as const;
 const numericFields = ["operatingHours", "temperature", "vibration", "pressure", "fuelConsumption"] as const;
 
-export function normalizeMachine(input: unknown, source: IngestionSource): Machine {
+export function normalizeMachine(input: unknown, source: IngestionSource, tenantId: string): Machine {
+  if (!tenantId.trim()) throw new ValidationError(["tenantId is required"]);
   if (!input || typeof input !== "object" || Array.isArray(input)) {
     throw new ValidationError(["row must be an object"]);
   }
@@ -61,6 +63,7 @@ export function normalizeMachine(input: unknown, source: IngestionSource): Machi
   if (issues.length) throw new ValidationError(issues);
 
   return {
+    tenantId,
     machineId: (row.machineId as string).trim(),
     model: (row.model as string).trim(),
     category: (row.category as string).trim(),
