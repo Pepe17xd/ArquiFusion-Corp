@@ -1,27 +1,42 @@
-﻿# ARQUIFUSION
+# ArquiFusion Corp
 
-## Hardening local y preparación de AWS Academy
+Monorepo para una plataforma de monitoreo y automatización industrial. Cada proveedor tiene una unidad de despliegue separada:
 
-La guía [Hardening local y AWS Academy](docs/aws-academy-hardening.md) documenta los cinco stacks locales declarados, propiedad de recursos, configuración con LabRole, concurrencia del Supervisor y límites de validación. Esta fase no desplegó recursos ni usó credenciales cloud.
+- `cloud/aws/`: API y lógica de negocio TypeScript, cinco stacks Serverless y modo local.
+- `cloud/gcp/intelligence/`: servicio Python independiente, preparado para Cloud Run.
+- `apps/frontend/`: aplicación React/Vite preparada para Cloudflare Pages.
+- `packages/contracts/`: esquemas JSON y contratos HTTP versionados, sin dependencias de runtime entre nubes.
 
-## Desarrollo local
+## Requisitos y comandos locales
 
-Requisitos: Node.js 24 y npm 10 o superior. Python 3.11 o superior solo para el servicio de inteligencia Python.
+Usa Node.js 24 y npm 10 o superior. Para Python usa 3.12 o superior; Docker es opcional para construir la imagen de GCP.
 
-~~~powershell
+```powershell
 npm ci
 npm test
 npm run build
 npm run infra:validate
-~~~
+```
 
-En terminales separadas: `npm run dev:api` y `npm run dev:web`. La API local usa identidad de desarrollo y persistencia bajo `backend/data/`; no necesita AWS.
+Para iniciar el modo local, ejecuta en terminales separadas:
 
-## Arquitectura resumida
+```powershell
+npm run dev:api
+npm run dev:web
+npm run dev:intelligence
+```
 
-El backend conserva un workspace TypeScript compartido y un servidor local integrado. Para AWS, cinco configuraciones Serverless separan stacks: platform (API HTTP, tenants, tablas comunes y bucket), fleet, ingestion, intelligence y supervisor (incluye State Machine). Los stacks de dominio se conectan a la API y recursos comunes usando IDs/nombres configurados desde los outputs de platform; no son microservicios con repositorios o runtimes separados. Ver guía para contratos, variables, permisos IAM y empaquetado independiente.
+La API local usa persistencia en `cloud/aws/data/` y no requiere credenciales AWS. El servicio Python valida el contrato de eventos, pero devuelve `503 provider-not-configured` para análisis hasta que se conecte un proveedor real.
 
-El frontend es React/Vite; la API normaliza CSV/JSON, sirve flota/métricas y ejecuta el workflow LangGraph determinista. Solo ese workflow está operativo. AWS/Cognito no han sido validados en una cuenta y Google Cloud queda fuera del alcance.
+## Despliegues
+
+Consulta [AWS Academy](cloud/aws/README.md), [Google Cloud Run](cloud/gcp/intelligence/README.md) y [Cloudflare Pages](apps/frontend/README.md). No se han desplegado recursos desde este repositorio. Los límites gratuitos, permisos y precios dependen de la cuenta y la región; compruébalos antes de crear recursos.
+
+## Arquitectura y contratos
+
+El frontend solo conoce la API HTTP versionada de AWS mediante `VITE_API_URL`. AWS es propietario de Cognito, API Gateway, Lambda, DynamoDB, S3 y Step Functions; el servicio Python no accede a esas bases ni importa código del backend. Una futura llamada AWS → Cloud Run debe usar autenticación de servicio a servicio, TLS, límites de payload, timeout, reintentos acotados, idempotencia y correlación de solicitudes. La interfaz inicial está descrita en `packages/contracts/openapi/intelligence.v1.yaml`.
+
+El backend TypeScript conserva su lógica determinista actual de inteligencia. El servicio GCP todavía no se conecta a ese flujo ni ejecuta un modelo predictivo.
 
 ## Licencia
 

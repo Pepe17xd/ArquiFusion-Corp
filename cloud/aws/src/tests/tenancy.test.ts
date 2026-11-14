@@ -195,7 +195,8 @@ test("adversarial API requests cannot cross tenant boundaries for fleet, ingesti
     assert.equal((await request(base, "token-a", "/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskType: "fleet.recommendations", tenantId: tenantB.tenant.tenantId }) })).status, 400);
     assert.equal((await request(base, "token-a", "/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskType: "fleet.recommendations" }) }, tenantB.tenant.tenantId)).status, 403);
     let taskBBeforeInternalTamper = await tasks.get(tenantB.tenant.tenantId, taskB.taskId);
-    for (let attempt = 0; attempt < 100 && taskBBeforeInternalTamper?.state !== "SUCCEEDED"; attempt += 1) {
+    // Local task execution is queued in the background; allow slower Windows CI/filesystems to finish.
+    for (let attempt = 0; attempt < 1000 && taskBBeforeInternalTamper?.state !== "SUCCEEDED"; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 5));
       taskBBeforeInternalTamper = await tasks.get(tenantB.tenant.tenantId, taskB.taskId);
     }

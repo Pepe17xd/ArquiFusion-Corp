@@ -108,4 +108,13 @@ assert.deepEqual(cognito.Resources.ArquiFusionWebClient.Properties.AllowedOAuthF
 assert.equal(cognito.Resources.ArquiFusionWebClient.Properties.EnableTokenRevocation, true);
 assert.equal(cognito.Resources.ArquiFusionWebClient.Properties.RefreshTokenRotation.Feature, "ENABLED");
 
-process.stdout.write("Static infrastructure checks passed: 5 Serverless stacks, 17 functions, 15 unique routes, shared resource ownership, external role references, JWT routes, retained tenant storage and Supervisor Standard workflow. This is not CloudFormation validation; no AWS call or deployment was made.\n");
+const contractPath = join(root, "../../packages/contracts/openapi/intelligence.v1.yaml");
+const contract = YAML.parse(readFileSync(contractPath, "utf8"));
+assert.equal(contract.openapi, "3.1.0");
+assert.ok(contract.paths?.["/v1/intelligence/analyze"]?.post, "versioned intelligence HTTP endpoint must be documented");
+assert.equal(contract.paths["/v1/intelligence/analyze"].post.responses?.["503"]?.description?.includes("proveedor"), true);
+const requestSchema = contract.paths["/v1/intelligence/analyze"].post.requestBody?.content?.["application/json"]?.schema?.$ref;
+assert.ok(requestSchema, "intelligence endpoint must use a shared JSON schema");
+assert.ok(existsSync(join(require("node:path").dirname(contractPath), requestSchema)), "OpenAPI request schema reference must resolve from the contract file");
+
+process.stdout.write("Static checks passed: 5 Serverless stacks, 17 functions, 15 unique routes, shared resource ownership, external role references, JWT routes, retained tenant storage, Supervisor Standard workflow and the versioned intelligence contract. This is not CloudFormation validation; no AWS call or deployment was made.\n");

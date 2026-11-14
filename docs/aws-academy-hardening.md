@@ -2,7 +2,7 @@
 
 ## Alcance y estado
 
-Esta fase modifica únicamente el repositorio local. No se usaron credenciales, no se consultó AWS/GCP y no hubo despliegues. La rama de trabajo al inicio fue `feature/aws-academy-hardening`; permanece sin commits ni cambios de rama.
+Esta fase modifica únicamente el repositorio local. No se usaron credenciales, no se consultó AWS/GCP y no hubo despliegues. Al inicio Git estaba limpio en `main`; no se crearon commits ni se cambió de rama.
 
 Estado actual: el backend continúa siendo un workspace TypeScript común y comparte contratos/adaptadores compilados, pero ahora dispone de cinco configuraciones Serverless y puntos de entrada Lambda por dominio. Esto permite stacks de despliegue independientes, no procesos de desarrollo independientes ni bases de datos aisladas. La separación real en AWS depende de desplegar primero la plataforma y pasar a cada stack valores concretos de recursos compartidos.
 
@@ -34,11 +34,11 @@ flowchart LR
   SFN --> Worker[Supervisor worker Lambda]
 ```
 
-`backend/serverless.yml` es el stack fundacional `arquifusion-platform`: es propietario de HTTP API, funciones health/tenants, tabla legacy, tabla activa de máquinas, tabla tenants/memberships, tabla tasks y bucket de originales. `backend/serverless.fleet.yml`, `serverless.ingestion.yml`, `serverless.intelligence.yml` y `serverless.supervisor.yml` poseen exclusivamente sus funciones/rutas; Supervisor también posee la state machine. Los stacks de dominio adjuntan rutas a la API existente con `HTTP_API_ID`; no crean otra API ni copian las tablas/bucket.
+`cloud/aws/serverless.yml` es el stack fundacional `arquifusion-platform`: es propietario de HTTP API, funciones health/tenants, tabla legacy, tabla activa de máquinas, tabla tenants/memberships, tabla tasks y bucket de originales. `cloud/aws/serverless.fleet.yml`, `serverless.ingestion.yml`, `serverless.intelligence.yml` y `serverless.supervisor.yml` poseen exclusivamente sus funciones/rutas; Supervisor también posee la state machine. Los stacks de dominio adjuntan rutas a la API existente con `HTTP_API_ID`; no crean otra API ni copian las tablas/bucket.
 
 La distribución de datos se configura por variables (`MACHINES_TABLE`, `TENANTS_TABLE`, `TASKS_TABLE`, `UPLOADS_BUCKET`, `TASK_STATE_MACHINE_ARN`) y el identificador de HTTP API. Los outputs del stack fundacional publican nombres/ID; no se usan imports CloudFormation entre stacks, para permitir su empaquetado y ciclo de vida independiente. Es responsabilidad del operador pasar valores del mismo stage/región/cuenta. No se debe borrar `platform` mientras haya stacks de dominio: eliminar primero los dominios. Actualizar o quitar un stack de dominio no requiere actualizar los otros, aunque eliminar rutas requiere confirmar que ese stack es el propietario de las rutas correspondientes.
 
-Empaquetado previsto desde `backend/`:
+Empaquetado previsto desde `cloud/aws/`:
 
 ```powershell
 npx serverless package --config serverless.yml --stage <stage> --region <region>
@@ -50,7 +50,7 @@ npx serverless package --config serverless.supervisor.yml --stage <stage> --regi
 
 El primer despliegue futuro sería `platform`, seguido por cada dominio. Cada servicio se puede actualizar o eliminar con su propio `--config`. Las variables de recursos compartidos deben mantenerse iguales por stage. El stack fundacional es una dependencia operativa, no una pila monolítica que deba actualizarse para cada cambio de Fleet.
 
-`createApiHandlers` continúa siendo la composición del servidor local completo. Las entradas Lambda en `backend/src/api/domains/` componen solo las dependencias de su dominio y las configuraciones restringen qué variables cloud son obligatorias. El código fuente/paquete npm sigue siendo compartido: la independencia lograda es de stack y entrypoint, no de repositorio, workspace o despliegue de artefactos versionados.
+`createApiHandlers` continúa siendo la composición del servidor local completo. Las entradas Lambda en `cloud/aws/src/api/domains/` componen solo las dependencias de su dominio y las configuraciones restringen qué variables cloud son obligatorias. El código fuente/paquete npm sigue siendo compartido: la independencia lograda es de stack y entrypoint, no de repositorio, workspace o despliegue de artefactos versionados.
 
 ## Servicios y dependencias
 
@@ -100,8 +100,12 @@ El store local serializa operaciones en proceso y escribe archivo local; prueba 
 
 Verificado localmente en esta revisión:
 
-- `npm test -w backend`: 50/50 pruebas aprobadas, incluye verificación JWT local, aislamiento adversarial A/B y pruebas de claims/versiones/eventos para stores local y Dynamo simulado.
-- `npm run infra:validate`: compila backend y pasa comprobaciones estructurales de cinco YAML Serverless, 17 funciones, 15 rutas únicas, propiedad de recursos, referencias de roles, JWT, almacenamiento retenido y workflow Standard.
+- `npm ci --ignore-scripts`: instalación limpia con workspaces reubicados; 95 paquetes instalados, 0 vulnerabilidades reportadas.
+- `npm test`: backend 50/50, frontend 7/7 y Python 2/2. Incluye verificación JWT local, aislamiento adversarial tenant A/B, concurrencia/claims/eventos del Supervisor y validación del esquema compartido.
+- Se amplió el tiempo de espera de una prueba del worker local en segundo plano tras observar una carrera de 500 ms durante la instalación limpia; la suite completa volvió a pasar 50/50.
+- `npm run build`: compilación TypeScript, build Vite y compilación sintáctica Python aprobados.
+- `npm run infra:validate`: pasa comprobaciones estructurales de cinco YAML Serverless, 17 funciones, 15 rutas únicas, propiedad de recursos, referencias de roles, JWT, almacenamiento retenido y workflow Standard.
+- El contexto Docker se comprobó estáticamente: ambos orígenes `COPY` existen en la raíz del monorepo. `docker build` no se pudo ejecutar porque el Docker Engine local no estaba disponible (`docker_engine` no encontrado).
 - Las configuraciones se parsearon con Serverless Framework 4.46.0 (`--version`) sin credenciales.
 - `serverless package` para las cinco configuraciones se intentó con variables ficticias no persistidas y sin credenciales. Framework v4 se detuvo en su requisito de sesión/licencia antes de empaquetar: “You must sign in or use a License Key”. No se inició sesión ni se configuró licencia, no se produjeron artefactos y no se validó el esquema/resolución AWS completo. No se ejecutó `serverless deploy`.
 - La validación estática propia NO equivale a `cfn-lint`, SAM ni validación oficial de CloudFormation. La integración real en API Gateway existente, nombres lógicos/output, permisos y aceptación del LabRole quedan pendientes.
@@ -130,4 +134,4 @@ npx serverless deploy --config serverless.supervisor.yml --stage <stage> --regio
 
 Para actualizar un dominio se repite solamente su comando `deploy --config ...`; para retirarlo, `npx serverless remove --config serverless.<dominio>.yml --stage <stage> --region <region>`. No quitar `platform` hasta retirar todos los dominios; las tablas y el bucket de foundation declaran `Retain` para conservar datos.
 
-No se recomienda ejecutar hasta completar la inspección de outputs/configuración y permisos indicada arriba. GCP permanece fuera de alcance.
+No se recomienda ejecutar hasta completar la inspección de outputs/configuración y permisos indicada arriba. Google Cloud y Cloudflare tienen guías independientes en `cloud/gcp/intelligence/README.md` y `apps/frontend/README.md`; ninguno se desplegó durante esta fase.

@@ -1,0 +1,64 @@
+openapi: 3.1.0
+info:
+  title: ArquiFusion Intelligence Service
+  version: 1.0.0
+  description: Interfaz HTTP versionada del servicio independiente de inteligencia.
+servers:
+  - url: https://{service-host}
+    variables:
+      service-host:
+        default: intelligence.example.run.app
+paths:
+  /health:
+    get:
+      operationId: health
+      responses:
+        '200':
+          description: Servicio disponible; no implica que exista un proveedor de modelo.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, intelligenceProvider]
+                properties:
+                  status: { const: ok }
+                  intelligenceProvider: { const: not-configured }
+  /v1/intelligence/analyze:
+    post:
+      operationId: analyzeIntelligenceV1
+      description: Acepta el sobre de evento v1. El proveedor aún no está configurado.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../events.schema.json
+      responses:
+        '400':
+          description: JSON, evento o tipo de evento inválido.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+        '503':
+          description: Contrato válido; proveedor de inteligencia sin configurar.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProviderUnavailable'
+components:
+  schemas:
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string }
+        details:
+          type: array
+          items: { type: string }
+    ProviderUnavailable:
+      type: object
+      required: [error, correlationId]
+      properties:
+        error: { const: provider-not-configured }
+        correlationId: { type: string }

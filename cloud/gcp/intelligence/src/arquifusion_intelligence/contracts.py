@@ -5,8 +5,8 @@ from pathlib import Path
 import json
 from typing import Any
 
-REPOSITORY_SCHEMA = Path(__file__).resolve().parents[4] / "shared" / "contracts" / "events.schema.json"
-CONTAINER_SCHEMA = Path("/app/shared/contracts/events.schema.json")
+REPOSITORY_SCHEMA = Path(__file__).resolve().parents[5] / "packages" / "contracts" / "events.schema.json"
+CONTAINER_SCHEMA = Path("/app/packages/contracts/events.schema.json")
 SCHEMA_PATH = REPOSITORY_SCHEMA if REPOSITORY_SCHEMA.is_file() else CONTAINER_SCHEMA
 EVENT_SCHEMA = json.loads(SCHEMA_PATH.read_text(encoding="utf-8"))
 EVENT_TYPES = set(EVENT_SCHEMA["properties"]["eventType"]["enum"])

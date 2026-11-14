@@ -26,7 +26,7 @@ test("shared v1 event envelope validates and rejects unknown fields", () => {
 });
 
 test("TypeScript event types stay aligned with the shared JSON schema", async () => {
-  const schema = JSON.parse(await readFile(resolve(__dirname, "../../../shared/contracts/events.schema.json"), "utf8"));
+  const schema = JSON.parse(await readFile(resolve(__dirname, "../../../../packages/contracts/events.schema.json"), "utf8"));
   assert.deepEqual([...EVENT_TYPES].sort(), [...schema.properties.eventType.enum].sort());
 });
 

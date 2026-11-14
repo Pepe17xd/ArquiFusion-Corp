@@ -4,10 +4,10 @@ dist/
 .serverless/
 .env*
 !.env.example
-backend/data/*.json
-backend/data/uploads/*
-!backend/data/.gitkeep
-!backend/data/uploads/.gitkeep
+cloud/aws/data/*.json
+cloud/aws/data/uploads/*
+!cloud/aws/data/.gitkeep
+!cloud/aws/data/uploads/.gitkeep
 __pycache__/
 *.py[cod]
 .pytest_cache/

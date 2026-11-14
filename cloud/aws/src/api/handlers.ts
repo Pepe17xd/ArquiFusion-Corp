@@ -36,7 +36,7 @@ export function createApiHandlers(services: ApiServices = createStorage()) {
   const authMode = services.authMode ?? "local";
   if (authMode === "cognito" && (!services.tenants || !services.tokenVerifier)) throw new Error("Cognito mode requires persistent tenant storage and a cryptographic access token verifier");
   if (services.storageMode === "cloud" && (!services.tasks || !services.dispatcher || authMode !== "cognito")) throw new Error("Cloud mode requires persistent task storage, a durable dispatcher and Cognito authentication");
-  const tenants = services.tenants ?? new LocalTenantDirectory(resolve(process.cwd(), "backend/data/tenants.json"));
+  const tenants = services.tenants ?? new LocalTenantDirectory(resolve(__dirname, "../../data/tenants.json"));
   const machines = services.machines;
   const originals = services.originals;
   const ingestion = new IngestionService(machines, originals);
