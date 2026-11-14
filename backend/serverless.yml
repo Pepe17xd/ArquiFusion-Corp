@@ -1,204 +1,135 @@
-service: arquifusion-intelligence
+service: arquifusion-platform
 frameworkVersion: '4'
+package:
+  individually: true
 provider:
   name: aws
   runtime: nodejs24.x
   region: ${opt:region, 'us-east-1'}
   stage: ${opt:stage, 'dev'}
+  # Shared LabRole compatibility mode. Functions may override this with a pre-existing role ARN.
+  iam:
+    role: ${env:AWS_LAMBDA_ROLE_ARN}
   httpApi:
     cors:
-      allowedOrigins: ['${env:WEB_ORIGIN, "http://localhost:5173"}']
-      allowedHeaders: [content-type, authorization, x-tenant-id]
+      allowedOrigins: ['${env:WEB_ORIGIN}']
+      allowedHeaders: [content-type, authorization, x-tenant-id, idempotency-key, x-correlation-id]
       allowedMethods: [GET, POST, OPTIONS]
     authorizers:
       cognito:
         type: jwt
         identitySource: $request.header.Authorization
         issuerUrl: ${env:COGNITO_ISSUER}
-        audience:
-          - ${env:COGNITO_AUDIENCE}
+        audience: ['${env:COGNITO_AUDIENCE}']
   environment:
     STORAGE_MODE: cloud
     AUTH_MODE: cognito
-    MACHINES_TABLE: ${self:service}-${sls:stage}-machines-v2
-    TENANTS_TABLE: ${self:service}-${sls:stage}-tenants
-    TASKS_TABLE: ${self:service}-${sls:stage}-tasks
-    UPLOADS_BUCKET: ${self:service}-${sls:stage}-${env:AWS_ACCOUNT_ID}-imports
+    TENANTS_TABLE: ${env:TENANTS_TABLE}
     COGNITO_ISSUER: ${env:COGNITO_ISSUER}
     COGNITO_AUDIENCE: ${env:COGNITO_AUDIENCE}
-  # Supply the existing LabRole ARN explicitly; this project never creates IAM roles.
-  iam:
-    role: ${env:AWS_LAMBDA_ROLE_ARN}
+    WEB_ORIGIN: ${env:WEB_ORIGIN}
 functions:
   health:
-    handler: dist/api/handlers.health
+    handler: dist/api/domains/platform.health
+    role: ${env:HEALTH_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
     events:
       - httpApi: {path: /health, method: GET}
-  ingestCsv:
-    handler: dist/api/handlers.ingestCsv
-    events:
-      - httpApi: {path: /ingest/csv, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
-  ingestJson:
-    handler: dist/api/handlers.ingestJson
-    events:
-      - httpApi: {path: /ingest/json, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
-  listMachines:
-    handler: dist/api/handlers.listMachines
-    events:
-      - httpApi: {path: /machines, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  getMachine:
-    handler: dist/api/handlers.getMachine
-    events:
-      - httpApi: {path: '/machines/{machineId}', method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  metrics:
-    handler: dist/api/handlers.metrics
-    events:
-      - httpApi: {path: /metrics, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  intelligence:
-    handler: dist/api/handlers.intelligence
-    events:
-      - httpApi: {path: /intelligence/recommendations, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  agents:
-    handler: dist/api/handlers.agents
-    events:
-      - httpApi: {path: /agents, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  submitTask:
-    handler: dist/api/handlers.submitTask
-    environment:
-      TASK_STATE_MACHINE_ARN: arn:aws:states:${aws:region}:${env:AWS_ACCOUNT_ID}:stateMachine:${self:service}-${sls:stage}-fleet-recommendations
-    events:
-      - httpApi: {path: /tasks, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
-  tasks:
-    handler: dist/api/handlers.tasks
-    events:
-      - httpApi: {path: /tasks, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  getTask:
-    handler: dist/api/handlers.getTask
-    events:
-      - httpApi: {path: '/tasks/{taskId}', method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  taskEvents:
-    handler: dist/api/handlers.taskEvents
-    events:
-      - httpApi: {path: /events, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
-  operationsOverview:
-    handler: dist/api/handlers.operationsOverview
-    events:
-      - httpApi: {path: /operations/overview, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
   listTenants:
-    handler: dist/api/handlers.listTenants
+    handler: dist/api/domains/platform.listTenants
+    role: ${env:TENANT_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
     events:
       - httpApi: {path: /tenants, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
   createTenant:
-    handler: dist/api/handlers.createTenant
+    handler: dist/api/domains/platform.createTenant
+    role: ${env:TENANT_WRITE_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
     events:
       - httpApi: {path: /tenants, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
-  runTask:
-    handler: dist/api/handlers.runTask
-    timeout: 300
-  markTaskDeadLetter:
-    handler: dist/api/handlers.markTaskDeadLetter
-    timeout: 30
 resources:
   Resources:
-    # Keep the old logical resource and schema in place; never replace its machineId-only table.
+    # Existing machine data is retained; the tenant-keyed table is the active fleet store.
+    LegacyMachinesTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        TableName: ${env:LEGACY_MACHINES_TABLE}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions: [{AttributeName: machineId, AttributeType: S}]
+        KeySchema: [{AttributeName: machineId, KeyType: HASH}]
     MachinesTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
       UpdateReplacePolicy: Retain
       Properties:
-        TableName: ${self:service}-${sls:stage}-machines
+        TableName: ${env:MACHINES_TABLE}
         BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions: [{AttributeName: machineId, AttributeType: S}]
-        KeySchema: [{AttributeName: machineId, KeyType: HASH}]
-    MachinesTableV2:
-      Type: AWS::DynamoDB::Table
-      DeletionPolicy: Retain
-      UpdateReplacePolicy: Retain
-      Properties:
-        TableName: ${self:provider.environment.MACHINES_TABLE}
-        BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - {AttributeName: pk, AttributeType: S}
-          - {AttributeName: sk, AttributeType: S}
-        KeySchema:
-          - {AttributeName: pk, KeyType: HASH}
-          - {AttributeName: sk, KeyType: RANGE}
+        AttributeDefinitions: [{AttributeName: pk, AttributeType: S}, {AttributeName: sk, AttributeType: S}]
+        KeySchema: [{AttributeName: pk, KeyType: HASH}, {AttributeName: sk, KeyType: RANGE}]
+        PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
     TenantsTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
       UpdateReplacePolicy: Retain
       Properties:
-        TableName: ${self:provider.environment.TENANTS_TABLE}
+        TableName: ${env:TENANTS_TABLE}
         BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - {AttributeName: pk, AttributeType: S}
-          - {AttributeName: sk, AttributeType: S}
-          - {AttributeName: gsi1pk, AttributeType: S}
-          - {AttributeName: gsi1sk, AttributeType: S}
-        KeySchema:
-          - {AttributeName: pk, KeyType: HASH}
-          - {AttributeName: sk, KeyType: RANGE}
+        AttributeDefinitions: [{AttributeName: pk, AttributeType: S}, {AttributeName: sk, AttributeType: S}, {AttributeName: gsi1pk, AttributeType: S}, {AttributeName: gsi1sk, AttributeType: S}]
+        KeySchema: [{AttributeName: pk, KeyType: HASH}, {AttributeName: sk, KeyType: RANGE}]
         GlobalSecondaryIndexes:
           - IndexName: ByUser
-            KeySchema:
-              - {AttributeName: gsi1pk, KeyType: HASH}
-              - {AttributeName: gsi1sk, KeyType: RANGE}
+            KeySchema: [{AttributeName: gsi1pk, KeyType: HASH}, {AttributeName: gsi1sk, KeyType: RANGE}]
             Projection: {ProjectionType: ALL}
+        PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
     TasksTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
       UpdateReplacePolicy: Retain
       Properties:
-        TableName: ${self:provider.environment.TASKS_TABLE}
+        TableName: ${env:TASKS_TABLE}
         BillingMode: PAY_PER_REQUEST
-        AttributeDefinitions:
-          - {AttributeName: pk, AttributeType: S}
-          - {AttributeName: sk, AttributeType: S}
-        KeySchema:
-          - {AttributeName: pk, KeyType: HASH}
-          - {AttributeName: sk, KeyType: RANGE}
+        AttributeDefinitions: [{AttributeName: pk, AttributeType: S}, {AttributeName: sk, AttributeType: S}]
+        KeySchema: [{AttributeName: pk, KeyType: HASH}, {AttributeName: sk, KeyType: RANGE}]
+        PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
     UploadsBucket:
       Type: AWS::S3::Bucket
       DeletionPolicy: Retain
       UpdateReplacePolicy: Retain
       Properties:
-        BucketName: ${self:provider.environment.UPLOADS_BUCKET}
-        PublicAccessBlockConfiguration:
-          BlockPublicAcls: true
-          IgnorePublicAcls: true
-          BlockPublicPolicy: true
-          RestrictPublicBuckets: true
+        BucketName: ${env:UPLOADS_BUCKET}
+        PublicAccessBlockConfiguration: {BlockPublicAcls: true, IgnorePublicAcls: true, BlockPublicPolicy: true, RestrictPublicBuckets: true}
         BucketEncryption:
           ServerSideEncryptionConfiguration:
             - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
-    FleetRecommendationsStateMachine:
-      Type: AWS::StepFunctions::StateMachine
+        OwnershipControls:
+          Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+    UploadsBucketPolicy:
+      Type: AWS::S3::BucketPolicy
       Properties:
-        StateMachineName: ${self:service}-${sls:stage}-fleet-recommendations
-        StateMachineType: STANDARD
-        RoleArn: ${env:AWS_STEP_FUNCTIONS_ROLE_ARN}
-        Definition:
-          StartAt: EjecutarWorkflow
-          States:
-            EjecutarWorkflow:
-              Type: Task
-              Resource: {Fn::GetAtt: [RunTaskLambdaFunction, Arn]}
-              Retry:
-                - ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException]
-                  IntervalSeconds: 2
-                  MaxAttempts: 2
-                  BackoffRate: 2
-              Catch:
-                - ErrorEquals: [States.ALL]
-                  ResultPath: $.workflowError
-                  Next: RegistrarFalloDurable
-              End: true
-            RegistrarFalloDurable:
-              Type: Task
-              Resource: {Fn::GetAtt: [MarkTaskDeadLetterLambdaFunction, Arn]}
-              Retry:
-                - ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException]
-                  IntervalSeconds: 2
-                  MaxAttempts: 2
-                  BackoffRate: 2
-              End: true
+        Bucket: {Ref: UploadsBucket}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: DenyInsecureTransport
+              Effect: Deny
+              Principal: '*'
+              Action: s3:*
+              Resource:
+                - {Fn::Sub: 'arn:${AWS::Partition}:s3:::${UploadsBucket}'}
+                - {Fn::Sub: 'arn:${AWS::Partition}:s3:::${UploadsBucket}/*'}
+              Condition: {Bool: {aws:SecureTransport: 'false'}}
+  Outputs:
+    HttpApiId:
+      Value: {Ref: HttpApi}
+      Export: {Name: 'arquifusion-${sls:stage}-HttpApiId'}
+    MachinesTableName:
+      Value: ${env:MACHINES_TABLE}
+      Export: {Name: 'arquifusion-${sls:stage}-MachinesTable'}
+    TenantsTableName:
+      Value: ${env:TENANTS_TABLE}
+      Export: {Name: 'arquifusion-${sls:stage}-TenantsTable'}
+    TasksTableName:
+      Value: ${env:TASKS_TABLE}
+      Export: {Name: 'arquifusion-${sls:stage}-TasksTable'}
+    UploadsBucketName:
+      Value: ${env:UPLOADS_BUCKET}
+      Export: {Name: 'arquifusion-${sls:stage}-UploadsBucket'}

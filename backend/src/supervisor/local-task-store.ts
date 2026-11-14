@@ -3,6 +3,8 @@ import { resolve } from "node:path";
 import type { AgentEvent, TaskRecord, TaskStore } from "./contracts";
 import { validateEvent } from "./event-contract";
 import { atomicWriteFile } from "../storage/local-file";
+import { assertClaimable, createTaskUpdate, normalizeTask } from "./task-state";
+import { TaskConflictError } from "./contracts";
 
 interface StoreData { tasks: TaskRecord[]; events: AgentEvent[] }
 
@@ -16,20 +18,47 @@ export class LocalTaskStore implements TaskStore {
     return this.serial(async () => {
       const data = await this.read();
       const existing = data.tasks.find((item) => item.tenantId === task.tenantId && item.idempotencyKey === task.idempotencyKey);
-      if (existing) return { task: existing, created: false };
-      data.tasks.push(task); data.events.push(event); await this.write(data);
-      return { task, created: true };
+      if (existing) return { task: normalizeTask(existing), created: false };
+      const normalized = normalizeTask(task);
+      data.tasks.push(normalized); data.events.push(event); await this.write(data);
+      return { task: normalized, created: true };
     });
   }
-  async get(tenantId: string, taskId: string) { return (await this.read()).tasks.find((task) => task.tenantId === tenantId && task.taskId === taskId); }
-  async list(tenantId: string) { return (await this.read()).tasks.filter((task) => task.tenantId === tenantId).sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
+  async get(tenantId: string, taskId: string) { const task = (await this.read()).tasks.find((item) => item.tenantId === tenantId && item.taskId === taskId); return task ? normalizeTask(task) : undefined; }
+  async list(tenantId: string) { return (await this.read()).tasks.filter((task) => task.tenantId === tenantId).map(normalizeTask).sort((a, b) => b.createdAt.localeCompare(a.createdAt)); }
   async events(tenantId: string, taskId?: string) { const events = (await this.read()).events.filter((event) => event.tenantId === tenantId); return taskId ? events.filter((event) => event.taskId === taskId) : events; }
   async update(task: TaskRecord, event: AgentEvent) {
     return this.serial(async () => {
       const data = await this.read();
       const index = data.tasks.findIndex((item) => item.tenantId === task.tenantId && item.taskId === task.taskId);
-      if (index < 0) throw new Error("Task not found");
-      data.tasks[index] = task; data.events.push(event); await this.write(data);
+      if (index < 0) throw new TaskConflictError("TASK_NOT_FOUND", "Task not found");
+      const current = normalizeTask(data.tasks[index]);
+      const eventId = `${task.taskId}:v${task.version + 1}:${event.eventType}`;
+      const priorEvent = data.events.find((item) => item.eventId === eventId);
+      if (priorEvent) {
+        if (!sameTransition(priorEvent, event)) throw new TaskConflictError("VERSION_CONFLICT", "Transition id was already used with different event data");
+        return current;
+      }
+      const updated = createTaskUpdate(current, task, event);
+      data.tasks[index] = updated.task;
+      data.events.push(updated.event);
+      await this.write(data);
+      return updated.task;
+    });
+  }
+
+  async claim(input: { tenantId: string; taskId: string; executionId: string; workerId: string; now: number; leaseDurationMs: number }) {
+    return this.serial(async () => {
+      const data = await this.read();
+      const index = data.tasks.findIndex((task) => task.tenantId === input.tenantId && task.taskId === input.taskId);
+      if (index < 0) throw new TaskConflictError("TASK_NOT_FOUND", "Task not found");
+      const current = normalizeTask(data.tasks[index]);
+      const claim = assertClaimable(current, input);
+      if (claim === "already-claimed") return { task: current, acquired: false };
+      data.tasks[index] = claim.task;
+      if (!data.events.some((event) => event.eventId === claim.event.eventId)) data.events.push(claim.event);
+      await this.write(data);
+      return { task: claim.task, acquired: true };
     });
   }
 
@@ -45,7 +74,7 @@ export class LocalTaskStore implements TaskStore {
       const parsed = JSON.parse(await readFile(this.path, "utf8")) as StoreData;
       if (!Array.isArray(parsed.tasks) || !Array.isArray(parsed.events)) throw new Error("Invalid supervisor state file");
       const normalized = {
-        tasks: parsed.tasks.map((task) => ({ ...task, tenantId: task.tenantId || "local-demo" })),
+        tasks: parsed.tasks.map((task) => normalizeTask({ ...task, tenantId: task.tenantId || "local-demo" })),
         events: parsed.events.map((event) => ({ ...event, tenantId: event.tenantId || "local-demo" })),
       };
       if (normalized.events.some((event) => !validateEvent(event))) throw new Error("Invalid supervisor state file");
@@ -58,4 +87,10 @@ export class LocalTaskStore implements TaskStore {
   private async write(data: StoreData) {
     await atomicWriteFile(this.path, JSON.stringify(data));
   }
+}
+
+function sameTransition(left: AgentEvent, right: AgentEvent) {
+  return left.eventType === right.eventType && left.tenantId === right.tenantId && left.taskId === right.taskId
+    && left.executionId === right.executionId && left.correlationId === right.correlationId
+    && JSON.stringify(left.payload) === JSON.stringify(right.payload);
 }

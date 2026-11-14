@@ -17,6 +17,7 @@ Resources:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: arquifusion-users
+      DeletionProtection: ACTIVE
       UsernameAttributes: [email]
       AutoVerifiedAttributes: [email]
       AdminCreateUserConfig:
@@ -52,13 +53,18 @@ Resources:
       ClientName: arquifusion-web
       UserPoolId: {Ref: ArquiFusionUserPool}
       GenerateSecret: false
+      EnableTokenRevocation: true
+      PreventUserExistenceErrors: ENABLED
+      RefreshTokenRotation:
+        Feature: ENABLED
+        RetryGracePeriodSeconds: 10
       AllowedOAuthFlowsUserPoolClient: true
       AllowedOAuthFlows: [code]
       AllowedOAuthScopes: [openid, email, profile, arquifusion/read, arquifusion/write]
       SupportedIdentityProviders: [COGNITO]
       CallbackURLs: [{Ref: CallbackUrl}]
       LogoutURLs: [{Ref: LogoutUrl}]
-      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH]
       AccessTokenValidity: 60
       IdTokenValidity: 60
       RefreshTokenValidity: 30

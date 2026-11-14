@@ -40,6 +40,10 @@ export interface TaskRecord {
   createdAt: string;
   updatedAt: string;
   state: TaskState;
+  /** Monotonic optimistic-lock version. Legacy persisted records normalize to version 1. */
+  version: number;
+  /** Lease held by one worker while it owns a RUNNING attempt. */
+  claim?: { workerId: string; executionId: string; leaseExpiresAt: number };
   attempts: number;
   maxAttempts: number;
   idempotencyKey: string;
@@ -52,13 +56,24 @@ export interface TaskStore {
   get(tenantId: string, taskId: string): Promise<TaskRecord | undefined>;
   list(tenantId: string): Promise<TaskRecord[]>;
   events(tenantId: string, taskId?: string): Promise<AgentEvent[]>;
-  update(task: TaskRecord, event: AgentEvent): Promise<void>;
+  update(task: TaskRecord, event: AgentEvent): Promise<TaskRecord>;
+  claim(input: { tenantId: string; taskId: string; executionId: string; workerId: string; now: number; leaseDurationMs: number }): Promise<{ task: TaskRecord; acquired: boolean }>;
+}
+
+export class TaskConflictError extends Error {
+  constructor(readonly code: "VERSION_CONFLICT" | "CLAIM_CONFLICT" | "INVALID_TRANSITION" | "TASK_NOT_FOUND", message: string) {
+    super(message); this.name = "TaskConflictError";
+  }
 }
 
 export interface TaskDispatcher {
-  dispatch(input: { tenantId: string; taskId: string }): Promise<void>;
+  dispatch(input: { tenantId: string; taskId: string; executionId: string; correlationId: string }): Promise<void>;
 }
 
 export class PermanentTaskError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "PermanentTaskError"; }
+}
+
+export class TaskDispatchError extends Error {
+  constructor() { super("Durable workflow dispatch failed; inspect task state before retrying"); this.name = "TaskDispatchError"; }
 }
