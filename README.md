@@ -1,5 +1,9 @@
 # ARQUIFUSION
 
+## Hardening local y preparación de AWS Academy
+
+Consulta [la guía de hardening](docs/aws-academy-hardening.md) para el diagnóstico, límites reales de servicios, aislamiento multi-tenant, pruebas de seguridad, roles mínimos, límites del validador de infraestructura y procedimiento de despliegue previsto. Esta fase no despliega recursos ni valida Cognito/AWS en una cuenta.
+
 Base SaaS multi-tenant para inteligencia operacional de flotas. El entorno local funciona sin cuentas cloud. El modo cloud declara autenticación Cognito, datos particionados por tenant, originales privados en S3 y workflows durables de recomendaciones con Step Functions.
 
 ## Desarrollo local

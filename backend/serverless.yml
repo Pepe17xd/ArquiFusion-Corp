@@ -1,5 +1,7 @@
 service: arquifusion-intelligence
 frameworkVersion: '4'
+package:
+  individually: true
 provider:
   name: aws
   runtime: nodejs24.x
@@ -7,8 +9,8 @@ provider:
   stage: ${opt:stage, 'dev'}
   httpApi:
     cors:
-      allowedOrigins: ['${env:WEB_ORIGIN, "http://localhost:5173"}']
-      allowedHeaders: [content-type, authorization, x-tenant-id]
+      allowedOrigins: ['${env:WEB_ORIGIN}']
+      allowedHeaders: [content-type, authorization, x-tenant-id, idempotency-key, x-correlation-id]
       allowedMethods: [GET, POST, OPTIONS]
     authorizers:
       cognito:
@@ -23,9 +25,11 @@ provider:
     MACHINES_TABLE: ${self:service}-${sls:stage}-machines-v2
     TENANTS_TABLE: ${self:service}-${sls:stage}-tenants
     TASKS_TABLE: ${self:service}-${sls:stage}-tasks
+    TASK_STATE_MACHINE_ARN: arn:aws:states:${aws:region}:${env:AWS_ACCOUNT_ID}:stateMachine:${self:service}-${sls:stage}-fleet-recommendations
     UPLOADS_BUCKET: ${self:service}-${sls:stage}-${env:AWS_ACCOUNT_ID}-imports
     COGNITO_ISSUER: ${env:COGNITO_ISSUER}
     COGNITO_AUDIENCE: ${env:COGNITO_AUDIENCE}
+    WEB_ORIGIN: ${env:WEB_ORIGIN}
   # Supply the existing LabRole ARN explicitly; this project never creates IAM roles.
   iam:
     role: ${env:AWS_LAMBDA_ROLE_ARN}
@@ -64,8 +68,6 @@ functions:
       - httpApi: {path: /agents, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
   submitTask:
     handler: dist/api/handlers.submitTask
-    environment:
-      TASK_STATE_MACHINE_ARN: arn:aws:states:${aws:region}:${env:AWS_ACCOUNT_ID}:stateMachine:${self:service}-${sls:stage}-fleet-recommendations
     events:
       - httpApi: {path: /tasks, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
   tasks:
@@ -123,6 +125,7 @@ resources:
         KeySchema:
           - {AttributeName: pk, KeyType: HASH}
           - {AttributeName: sk, KeyType: RANGE}
+        PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
     TenantsTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
@@ -144,6 +147,7 @@ resources:
               - {AttributeName: gsi1pk, KeyType: HASH}
               - {AttributeName: gsi1sk, KeyType: RANGE}
             Projection: {ProjectionType: ALL}
+        PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
     TasksTable:
       Type: AWS::DynamoDB::Table
       DeletionPolicy: Retain
@@ -157,6 +161,7 @@ resources:
         KeySchema:
           - {AttributeName: pk, KeyType: HASH}
           - {AttributeName: sk, KeyType: RANGE}
+        PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
     UploadsBucket:
       Type: AWS::S3::Bucket
       DeletionPolicy: Retain
@@ -171,6 +176,24 @@ resources:
         BucketEncryption:
           ServerSideEncryptionConfiguration:
             - ServerSideEncryptionByDefault: {SSEAlgorithm: AES256}
+        OwnershipControls:
+          Rules: [{ObjectOwnership: BucketOwnerEnforced}]
+    UploadsBucketPolicy:
+      Type: AWS::S3::BucketPolicy
+      Properties:
+        Bucket: {Ref: UploadsBucket}
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+            - Sid: DenyInsecureTransport
+              Effect: Deny
+              Principal: '*'
+              Action: s3:*
+              Resource:
+                - arn:aws:s3:::${self:provider.environment.UPLOADS_BUCKET}
+                - arn:aws:s3:::${self:provider.environment.UPLOADS_BUCKET}/*
+              Condition:
+                Bool: {aws:SecureTransport: 'false'}
     FleetRecommendationsStateMachine:
       Type: AWS::StepFunctions::StateMachine
       Properties:
@@ -182,6 +205,7 @@ resources:
           States:
             EjecutarWorkflow:
               Type: Task
+              TimeoutSeconds: 330
               Resource: {Fn::GetAtt: [RunTaskLambdaFunction, Arn]}
               Retry:
                 - ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException]
@@ -201,4 +225,8 @@ resources:
                   IntervalSeconds: 2
                   MaxAttempts: 2
                   BackoffRate: 2
-              End: true
+              Next: EjecucionFallida
+            EjecucionFallida:
+              Type: Fail
+              Error: FleetWorkflowFailed
+              Cause: The fleet workflow did not complete successfully.

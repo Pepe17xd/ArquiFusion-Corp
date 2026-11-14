@@ -1,10 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import type { Tenant, TenantContext, TenantDirectory, TenantMembership, TenantRole } from "./contracts";
-import { isTenantRole, TenantAccessError } from "./contracts";
+import type { Tenant, TenantContext, TenantDirectory, TenantMembership } from "./contracts";
+import { isTenantRole, TenantAccessError, TenantConflictError } from "./contracts";
 import { atomicWriteFile } from "../storage/local-file";
 
-interface LocalDirectoryData { tenants: Tenant[]; memberships: TenantMembership[] }
+interface LocalDirectoryData { tenants: Tenant[]; memberships: TenantMembership[]; creationRequests?: Record<string, string> }
 
 /** Explicit local-only identity/membership simulation. It is never selected in cloud mode. */
 export class LocalTenantDirectory implements TenantDirectory {
@@ -29,14 +29,29 @@ export class LocalTenantDirectory implements TenantDirectory {
     });
   }
 
-  async createTenant(userSub: string, name: string) {
+  async createTenant(userSub: string, name: string, idempotencyKey: string) {
     const cleanName = name.trim();
     if (!cleanName || cleanName.length > 120) throw new TenantAccessError("Tenant name must contain 1 to 120 characters");
+    if (!idempotencyKey.trim() || idempotencyKey.length > 200) throw new TenantAccessError("A valid Idempotency-Key is required");
     return this.serial(async () => {
       const data = await this.read();
+      data.creationRequests ??= {};
+      const requestKey = `${userSub}:${idempotencyKey}`;
+      const existingTenantId = data.creationRequests[requestKey];
+      if (existingTenantId) {
+        const tenant = data.tenants.find((item) => item.tenantId === existingTenantId);
+        const membership = data.memberships.find((item) => item.tenantId === existingTenantId && item.userSub === userSub);
+        if (tenant && membership) {
+          if (tenant.name !== cleanName) throw new TenantConflictError("Idempotency-Key was already used with different organization data");
+          return { tenant, membership };
+        }
+      }
+      if (data.memberships.some((item) => item.userSub === userSub)) {
+        throw new TenantConflictError("Self-service organization creation is limited to one organization per account");
+      }
       const tenant: Tenant = { tenantId: randomUUID(), name: cleanName, createdAt: new Date().toISOString(), status: "active" };
       const membership: TenantMembership = { tenantId: tenant.tenantId, userSub, role: "owner", createdAt: tenant.createdAt };
-      data.tenants.push(tenant); data.memberships.push(membership); await this.write(data);
+      data.tenants.push(tenant); data.memberships.push(membership); data.creationRequests[requestKey] = tenant.tenantId; await this.write(data);
       return { tenant, membership };
     });
   }

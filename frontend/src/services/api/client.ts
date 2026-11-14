@@ -69,7 +69,7 @@ export interface OperationsOverview {
   recentEvents: AgentEvent[]; domains: { inventory: string; technicianAssignment: string; incidents: string };
 }
 
-import { accessToken, authMode, selectedTenantId, clearSession, type TenantChoice } from "../auth/session";
+import { accessToken, authMode, selectedTenantId, expireSession, type TenantChoice } from "../auth/session";
 
 const apiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
@@ -88,7 +88,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const envelope = await response.json().catch(() => ({}));
   if (!response.ok) {
     if (response.status === 401 && authMode === "cognito") {
-      clearSession(); window.dispatchEvent(new Event("arquifusion:session-expired"));
+      expireSession();
     }
     const details = envelope?.data?.details;
     throw new Error(Array.isArray(details) ? details.join("; ") : envelope?.data?.error || "HTTP " + response.status);
@@ -98,7 +98,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export const apiSession = {
   tenants: () => request<TenantChoice[]>("/tenants"),
-  createTenant: (name: string) => request<TenantChoice>("/tenants", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }),
+  createTenant: (name: string, idempotencyKey: string) => request<TenantChoice>("/tenants", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify({ name }) }),
 };
 
 export const fleetApi = {

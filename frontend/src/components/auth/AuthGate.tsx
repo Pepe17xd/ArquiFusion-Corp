@@ -9,6 +9,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [tenants, setTenants] = useState<TenantChoice[]>([]);
   const [tenantId, setTenantId] = useState(selectedTenantId());
   const [tenantName, setTenantName] = useState("");
+  const [tenantRequestKey] = useState(() => crypto.randomUUID());
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const configured = Boolean(import.meta.env.VITE_COGNITO_CLIENT_ID && import.meta.env.VITE_COGNITO_DOMAIN);
@@ -47,7 +48,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     event.preventDefault(); if (!tenantName.trim()) return;
     setBusy(true); setError("");
     try {
-      const created = await apiSession.createTenant(tenantName.trim());
+      const created = await apiSession.createTenant(tenantName.trim(), tenantRequestKey);
       const next = [...tenants, created]; setTenants(next); selectTenant(created.tenant.tenantId); setTenantId(created.tenant.tenantId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo crear el espacio de trabajo."); }
     finally { setBusy(false); }
@@ -61,8 +62,8 @@ export function AuthGate({ children }: { children: ReactNode }) {
     <p>Un espacio seguro para comprender el estado de su flota y convertir datos operativos en decisiones.</p>
     {error && <div className="auth-error" role="alert">{error}</div>}
     {!configured && <div className="auth-error" role="status">Cognito no está configurado en este frontend. Define las variables VITE_COGNITO_* para habilitar el acceso.</div>}
-    <button className="auth-primary" disabled={!configured} onClick={() => { try { beginLogin(false); } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo iniciar el acceso."); } }}>Iniciar sesión</button>
-    <button className="auth-secondary" disabled={!configured} onClick={() => { try { beginLogin(true); } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo abrir el registro."); } }}>Crear una cuenta</button>
+    <button className="auth-primary" disabled={!configured} onClick={() => { void beginLogin(false).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "No se pudo iniciar el acceso.")); }}>Iniciar sesión</button>
+    <button className="auth-secondary" disabled={!configured} onClick={() => { void beginLogin(true).catch((reason: unknown) => setError(reason instanceof Error ? reason.message : "No se pudo abrir el registro.")); }}>Crear una cuenta</button>
     <small>Autenticación gestionada por Amazon Cognito. Las operaciones requieren una membresía verificada.</small>
   </div><div className="auth-ambient" aria-hidden="true"><div className="auth-orbit orbit-a"/><div className="auth-orbit orbit-b"/><div className="auth-core"/></div></section>;
   if (!tenantId) return <section className="auth-shell"><div className="auth-panel">

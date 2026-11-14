@@ -27,10 +27,11 @@ export class AgentSupervisor {
     if (created.created) {
       await this.store.update(created.task, createEvent({ eventType: "AgentTaskAssigned", tenantId: task.tenantId, taskId: task.taskId, executionId: task.executionId, correlationId: task.correlationId, payload: { agentId: agent.id } }));
       if (this.dispatcher) {
-        try { await this.dispatcher.dispatch({ tenantId: task.tenantId, taskId: task.taskId }); }
+        try { await this.dispatcher.dispatch({ tenantId: task.tenantId, taskId: task.taskId, executionId: task.executionId, correlationId: task.correlationId }); }
         catch {
           const failed = { ...created.task, state: "FAILED" as const, updatedAt: new Date().toISOString(), error: { code: "DISPATCH_FAILURE", message: "No se pudo iniciar el workflow durable.", retryable: false } };
           await this.store.update(failed, createEvent({ eventType: "AgentTaskFailed", tenantId: task.tenantId, taskId: task.taskId, executionId: task.executionId, correlationId: task.correlationId, payload: { code: "DISPATCH_FAILURE", state: "FAILED" } }));
+          console.error(JSON.stringify({ event: "workflow.dispatch.failed", tenantId: task.tenantId, taskId: task.taskId, executionId: task.executionId, correlationId: task.correlationId, errorCode: "DISPATCH_FAILURE" }));
           return { task: failed, created: true };
         }
       } else queueMicrotask(() => { void this.execute(task.tenantId, task.taskId); });
@@ -42,8 +43,9 @@ export class AgentSupervisor {
   list(tenantId: string) { return this.store.list(tenantId); }
   events(tenantId: string, taskId?: string) { return this.store.events(tenantId, taskId); }
 
-  async markWorkflowFailure(input: { tenantId: string; taskId: string }) {
+  async markWorkflowFailure(input: { tenantId: string; taskId: string; executionId: string; correlationId: string }) {
     const task = await this.store.get(input.tenantId, input.taskId);
+    if (task && (task.executionId !== input.executionId || task.correlationId !== input.correlationId)) throw new PermanentTaskError("WORKFLOW_CONTEXT_MISMATCH", "El contexto de ejecución no coincide con la tarea persistida.");
     if (!task || ["SUCCEEDED", "FAILED", "DEAD_LETTER"].includes(task.state)) return task;
     const failed: TaskRecord = { ...task, state: "DEAD_LETTER", updatedAt: new Date().toISOString(), error: { code: "WORKFLOW_FAILURE", message: "El workflow durable terminó sin completar la tarea.", retryable: false } };
     await this.store.update(failed, createEvent({ eventType: "AgentTaskFailed", tenantId: failed.tenantId, taskId: failed.taskId, executionId: failed.executionId, correlationId: failed.correlationId, payload: { code: "WORKFLOW_FAILURE", state: "DEAD_LETTER" } }));
@@ -52,7 +54,7 @@ export class AgentSupervisor {
 
   private async execute(tenantId: string, taskId: string) {
     try { await this.executeTask(tenantId, taskId); }
-    catch (error) { console.error("supervisor_execution_failed", { taskId, errorName: error instanceof Error ? error.name : "UnknownError", code: error && typeof error === "object" && "code" in error ? String(error.code) : undefined }); }
+    catch (error) { console.error(JSON.stringify({ event: "supervisor.execution.failed", tenantId, taskId, errorName: error instanceof Error ? error.name : "UnknownError", code: error && typeof error === "object" && "code" in error ? String(error.code) : undefined })); }
   }
 
   async executeTask(tenantId: string, taskId: string) {

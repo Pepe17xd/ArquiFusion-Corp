@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type ServerResponse, type Server } from "node:http";
+import { randomUUID } from "node:crypto";
 import { createApiHandlers, type ApiServices } from "./api/handlers";
 import { MAX_IMPORT_BYTES } from "./ingestion/service";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
@@ -8,9 +9,11 @@ const allowedMethods = "GET,POST,OPTIONS";
 export function createLocalServer(services?: ApiServices): Server {
   const handlers = createApiHandlers(services);
   return createServer(async (request, response) => {
-    response.setHeader("access-control-allow-origin", "*");
+    const allowedOrigin = process.env.WEB_ORIGIN ?? "http://localhost:5173";
+    if (request.headers.origin === allowedOrigin) response.setHeader("access-control-allow-origin", allowedOrigin);
+    response.setHeader("vary", "Origin");
     response.setHeader("access-control-allow-methods", allowedMethods);
-    response.setHeader("access-control-allow-headers", "content-type,authorization,x-tenant-id");
+    response.setHeader("access-control-allow-headers", "content-type,authorization,x-tenant-id,idempotency-key,x-correlation-id");
     if (request.method === "OPTIONS") { response.writeHead(204).end(); return; }
 
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -29,7 +32,7 @@ export function createLocalServer(services?: ApiServices): Server {
         requestContext: {
           accountId: "local", apiId: "local", domainName: "localhost", domainPrefix: "localhost",
           http: { method: request.method ?? "GET", path: url.pathname, protocol: "HTTP/1.1", sourceIp: "127.0.0.1", userAgent: request.headers["user-agent"] ?? "local" },
-          requestId: "local", routeKey: request.method + " " + url.pathname, stage: "$default", time: new Date().toISOString(), timeEpoch: Date.now(),
+          requestId: randomUUID(), routeKey: request.method + " " + url.pathname, stage: "$default", time: new Date().toISOString(), timeEpoch: Date.now(),
         },
         body: body || undefined,
         isBase64Encoded: false,
@@ -62,7 +65,7 @@ type HandlerSet = ReturnType<typeof createApiHandlers>;
 type LocalHandler = (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2>;
 function resolveRoute(method: string, pathname: string, handlers: HandlerSet): { handler: LocalHandler; machineId?: string; taskId?: string } | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
-  if (method === "GET" && path === "/health") return { handler: async () => handlers.health() };
+  if (method === "GET" && path === "/health") return { handler: handlers.health as LocalHandler };
   if (method === "POST" && path === "/ingest/csv") return { handler: handlers.ingestCsv as LocalHandler };
   if (method === "POST" && path === "/ingest/json") return { handler: handlers.ingestJson as LocalHandler };
   if (method === "GET" && path === "/machines") return { handler: handlers.listMachines as LocalHandler };

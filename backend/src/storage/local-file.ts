@@ -12,8 +12,8 @@ export async function atomicWriteFile(file: string, content: string, mode = 0o60
       try { await rename(temporary, file); return; }
       catch (error) {
         const code = (error as NodeJS.ErrnoException).code;
-        if (!code || !["EPERM", "EACCES", "EBUSY"].includes(code) || attempt >= 5) throw error;
-        await new Promise((resolve) => setTimeout(resolve, 10 * (attempt + 1)));
+        if (!code || !["EPERM", "EACCES", "EBUSY"].includes(code) || attempt >= 19) throw error;
+        await new Promise((resolve) => setTimeout(resolve, Math.min(25 * (attempt + 1), 250)));
       }
     }
   } finally {
