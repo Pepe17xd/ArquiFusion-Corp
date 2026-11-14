@@ -1,0 +1,36 @@
+service: arquifusion-ingestion
+frameworkVersion: '4'
+package: {individually: true}
+provider:
+  name: aws
+  runtime: nodejs24.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role: ${env:AWS_LAMBDA_ROLE_ARN}
+  httpApi:
+    id: ${env:HTTP_API_ID}
+    authorizers:
+      cognito:
+        type: jwt
+        identitySource: $request.header.Authorization
+        issuerUrl: ${env:COGNITO_ISSUER}
+        audience: ['${env:COGNITO_AUDIENCE}']
+  environment:
+    STORAGE_MODE: cloud
+    AUTH_MODE: cognito
+    MACHINES_TABLE: ${env:MACHINES_TABLE}
+    TENANTS_TABLE: ${env:TENANTS_TABLE}
+    UPLOADS_BUCKET: ${env:UPLOADS_BUCKET}
+    COGNITO_ISSUER: ${env:COGNITO_ISSUER}
+    COGNITO_AUDIENCE: ${env:COGNITO_AUDIENCE}
+    WEB_ORIGIN: ${env:WEB_ORIGIN}
+functions:
+  ingestCsv:
+    handler: dist/api/domains/ingestion.ingestCsv
+    role: ${env:INGESTION_WRITE_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /ingest/csv, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}}]
+  ingestJson:
+    handler: dist/api/domains/ingestion.ingestJson
+    role: ${env:INGESTION_WRITE_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    events: [{httpApi: {path: /ingest/json, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}}]

@@ -194,9 +194,15 @@ test("adversarial API requests cannot cross tenant boundaries for fleet, ingesti
     assert.deepEqual(taskAEvents.data, []);
     assert.equal((await request(base, "token-a", "/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskType: "fleet.recommendations", tenantId: tenantB.tenant.tenantId }) })).status, 400);
     assert.equal((await request(base, "token-a", "/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskType: "fleet.recommendations" }) }, tenantB.tenant.tenantId)).status, 403);
-    const beforeInternalTamper = await tasks.get(tenantB.tenant.tenantId, taskB.taskId);
-    await assert.rejects(handlers.runTask({ tenantId: tenantA.tenant.tenantId, taskId: taskB.taskId }), /Invalid workflow input/);
-    assert.equal((await tasks.get(tenantB.tenant.tenantId, taskB.taskId))?.state, beforeInternalTamper?.state);
+    let taskBBeforeInternalTamper = await tasks.get(tenantB.tenant.tenantId, taskB.taskId);
+    for (let attempt = 0; attempt < 100 && taskBBeforeInternalTamper?.state !== "SUCCEEDED"; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      taskBBeforeInternalTamper = await tasks.get(tenantB.tenant.tenantId, taskB.taskId);
+    }
+    assert.equal(taskBBeforeInternalTamper?.state, "SUCCEEDED");
+    const taskBCompleted = taskBBeforeInternalTamper!;
+    await assert.rejects(handlers.runTask({ tenantId: tenantA.tenant.tenantId, taskId: taskB.taskId, executionId: taskBCompleted.executionId, correlationId: taskBCompleted.correlationId }), /Workflow context does not match/);
+    assert.equal((await tasks.get(tenantB.tenant.tenantId, taskB.taskId))?.state, taskBCompleted.state);
 
     assert.equal((await request(base, "token-a", "/tasks").then((response) => response.json()) as { data: unknown[] }).data.length, 1);
     assert.equal((await request(base, "token-no-membership", "/machines", {}, tenantA.tenant.tenantId)).status, 403);

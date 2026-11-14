@@ -17,6 +17,8 @@ export interface AppConfig {
   webOrigin?: string;
 }
 
+export type RuntimeDomain = "all" | "platform" | "fleet" | "ingestion" | "intelligence" | "supervisor";
+
 function isCognitoIssuer(value: string) {
   try {
     const url = new URL(value);
@@ -31,13 +33,23 @@ function isSecureOrigin(value: string) {
   catch { return false; }
 }
 
-export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
+export function loadConfig(env: NodeJS.ProcessEnv = process.env, domain: RuntimeDomain = "all"): AppConfig {
   const storageMode = env.STORAGE_MODE ?? "local";
   const authMode = env.AUTH_MODE ?? (storageMode === "local" ? "local" : "cognito");
   if (storageMode !== "local" && storageMode !== "cloud") {
     throw new ConfigurationError("STORAGE_MODE must be local or cloud");
   }
-  if (storageMode === "cloud" && (!env.MACHINES_TABLE || !env.UPLOADS_BUCKET || !env.TENANTS_TABLE || !env.TASKS_TABLE || !env.TASK_STATE_MACHINE_ARN)) throw new ConfigurationError("MACHINES_TABLE, TENANTS_TABLE, TASKS_TABLE, UPLOADS_BUCKET and TASK_STATE_MACHINE_ARN are required in cloud mode");
+  const requiredCloudValues: Partial<Record<RuntimeDomain, string[]>> = {
+    all: ["MACHINES_TABLE", "UPLOADS_BUCKET", "TENANTS_TABLE", "TASKS_TABLE", "TASK_STATE_MACHINE_ARN"],
+    platform: ["TENANTS_TABLE"], fleet: ["MACHINES_TABLE", "TENANTS_TABLE"],
+    ingestion: ["MACHINES_TABLE", "TENANTS_TABLE", "UPLOADS_BUCKET"],
+    intelligence: ["MACHINES_TABLE", "TENANTS_TABLE"],
+    supervisor: ["MACHINES_TABLE", "TENANTS_TABLE", "TASKS_TABLE", "TASK_STATE_MACHINE_ARN"],
+  };
+  if (storageMode === "cloud") {
+    const missing = (requiredCloudValues[domain] ?? requiredCloudValues.all!).filter((key) => !env[key]);
+    if (missing.length) throw new ConfigurationError(`Missing cloud configuration for ${domain}: ${missing.join(", ")}`);
+  }
   if (authMode !== "local" && authMode !== "cognito") throw new ConfigurationError("AUTH_MODE must be local or cognito");
   if (storageMode === "cloud" && authMode !== "cognito") throw new ConfigurationError("Cloud mode requires AUTH_MODE=cognito");
   if (storageMode === "local" && authMode !== "local") throw new ConfigurationError("Local mode requires AUTH_MODE=local and never contacts Cognito");
