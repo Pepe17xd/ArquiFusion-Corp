@@ -56,7 +56,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   if (authMode === "local") return <>{children}</>;
   if (!ready) return <section className="auth-shell"><div className="auth-panel"><span className="auth-kicker">ARQUIFUSION / IDENTIDAD</span><h1>Verificando sesión</h1><p>Conectando con la identidad de la organización.</p></div></section>;
-  if (!authenticated) return <section className="auth-shell"><div className="auth-panel">
+  if (!authenticated) return <section className="auth-shell auth-split"><div className="auth-visual"><a href="/" className="auth-visual-brand"><img src="/arquifusion-mark.svg" alt=""/> ARQUIFUSION</a><div><span>INTELIGENCIA OPERACIONAL / ACCESO SEGURO</span><h2>La operación,<br/><em>en perspectiva.</em></h2><p>Datos y decisiones conectados para la maquinaria que mueve el mundo.</p></div><small>ARQUIFUSION / CENTRO DE OPERACIONES</small></div><div className="auth-panel">
     <div className="auth-brand"><img src="/arquifusion-mark.svg" alt=""/><strong>ARQUIFUSION</strong></div>
     <span className="auth-kicker">INTELIGENCIA OPERACIONAL</span><h1>Control con contexto.</h1>
     <p>Un espacio seguro para comprender el estado de su flota y convertir datos operativos en decisiones.</p>

@@ -1,0 +1,32 @@
+/* Each section receives monotonic, viewport-derived progress; defaults keep content usable without JS. */
+.landing-hero,.landing-section{--photo:1;--title:1;--primary:1;--connections:1;--details:1}
+.landing-hero .hero-content,.landing-hero .hero-content h1,.landing-hero .hero-content p,.landing-hero .hero-actions,.hero-logo-fragments img,.telemetry-lines{animation:none!important}
+.landing-hero .hero-photo{clip-path:inset(0 calc((1 - var(--photo))*12%) 0 0)}
+.landing-hero .hero-content h1,.problem-copy h2,.preview-section h2{opacity:calc(.45 + var(--title)*.55);transform:translateY(calc((1 - var(--title))*24px))}
+.hero-logo-fragments img:nth-child(1){transform:translate(calc((1 - var(--primary))*-38px),calc((1 - var(--primary))*-22px)) rotate(calc((1 - var(--primary))*-8deg))}
+.hero-logo-fragments img:nth-child(2){transform:translateX(calc((1 - var(--connections))*35px))}
+.hero-logo-fragments img:nth-child(3){transform:translate(calc((1 - var(--details))*-25px),calc((1 - var(--details))*28px))}
+.problem-photo{clip-path:polygon(10% 0,calc(10% + var(--photo)*90%) 8%,calc(10% + var(--photo)*80%) 100%,0 91%)}
+.title-fragment{display:inline-block;transform:translateX(calc((1 - var(--title))*-18px))}.title-fragment-two{transform:translateX(calc((1 - var(--primary))*24px));opacity:calc(.45 + var(--primary)*.55)}
+.problem-fragment{animation:none!important;opacity:var(--primary)}
+.fragment-data{transform:translateX(calc((1 - var(--primary))*-45px))}
+.fragment-signals{transform:translateX(calc((1 - var(--connections))*45px));opacity:var(--connections)}
+.fragment-tasks{transform:translateY(calc((1 - var(--details))*35px));opacity:var(--details)}
+.problem-line{animation:none!important;scale:var(--connections) 1;opacity:var(--connections)}
+.capability-grid article:nth-child(1),.flow>div:nth-child(1){opacity:calc(.35 + var(--primary)*.65);transform:translateY(calc((1 - var(--primary))*20px))}
+.capability-grid article:nth-child(2),.flow>div:nth-child(2){opacity:calc(.35 + var(--connections)*.65);transform:translateY(calc((1 - var(--connections))*20px))}
+.capability-grid article:nth-child(n+3),.flow>div:nth-child(n+3){opacity:calc(.35 + var(--details)*.65);transform:translateY(calc((1 - var(--details))*20px))}
+.product-assembly{overflow:hidden;opacity:calc(.4 + var(--photo)*.6);transform:translateY(calc((1 - var(--photo))*35px));background:#07151c}
+.product-metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:14px;opacity:var(--primary);transform:translateY(calc((1 - var(--primary))*20px))}
+.product-metrics div,.product-side div{border:1px solid #294952;background:#0d2028;padding:12px;color:#8eaab0;font-size:8px;letter-spacing:.12em}
+.product-metrics b{display:block;color:#b9e0e2;font-size:19px;margin-top:8px}
+.product-modules{position:relative;display:grid;grid-template-columns:1fr .65fr;gap:10px;padding:0 14px 14px;min-height:220px}
+.product-brain,.product-side>div{border:1px solid #31515c;background:#0b1c24;position:relative;z-index:1}
+.product-brain{padding:12px;text-align:center;opacity:var(--details);transform:scale(calc(.9 + var(--details)*.1))}
+.product-brain span,.product-brain small{font-size:8px;color:#83bbc1;letter-spacing:.12em}.product-brain svg{display:block;width:85%;height:150px;margin:auto}
+.product-side{display:grid;gap:8px;opacity:var(--connections);transform:translateX(calc((1 - var(--connections))*28px))}.product-side i{display:block;margin-top:15px;width:70%;height:2px;background:#365e68}
+.product-links{position:absolute;inset:20% 10%;width:80%;height:60%;z-index:2;pointer-events:none}.product-links path{fill:none;stroke:#63dce8;stroke-width:1;stroke-dasharray:500;stroke-dashoffset:calc(500 * (1 - var(--connections)))}
+.team-grid article:nth-child(1){opacity:calc(.35 + var(--primary)*.65)}.team-grid article:nth-child(2){opacity:calc(.35 + var(--connections)*.65)}.team-grid article:nth-child(3){opacity:calc(.35 + var(--details)*.65)}
+.landing-section:focus-within,.landing-section:focus-within *{opacity:1!important;clip-path:none!important;transform:none!important}
+@media(max-width:800px){.hero-logo-fragments img{filter:none}.problem-photo{clip-path:inset(0 calc((1 - var(--photo))*35%) 0 0)}.product-modules{min-height:180px}.product-brain svg{height:110px}}
+@media(prefers-reduced-motion:reduce){.landing-hero,.landing-section{--photo:1!important;--title:1!important;--primary:1!important;--connections:1!important;--details:1!important}}

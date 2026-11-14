@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import type { FormEvent } from "react";
-import { fleetApi, type FleetMetrics, type Machine, type OperationsOverview, type RecommendationResult } from "./services/api/client";
+import { fleetApi, apiSession, type AgentTask, type FleetMetrics, type Machine, type OperationsOverview, type RecommendationResult } from "./services/api/client";
 import { NavigationRail, type AppView } from "./components/navigation/NavigationRail";
 import { TopBar } from "./components/layout/TopBar";
 import { FeedbackBanner } from "./components/feedback/FeedbackBanner";
@@ -10,7 +10,7 @@ import { AgentCommand } from "./features/intelligence/AgentCommand";
 import { ActivityView } from "./features/operations/ActivityView";
 import { IngestionView } from "./features/ingestion/IngestionView";
 import { PlannedView } from "./features/planned/PlannedView";
-import { authMode, signOut } from "./services/auth/session";
+import { authMode, selectedTenantId, signOut } from "./services/auth/session";
 import "./style.css";
 import "./supervisor.css";
 
@@ -27,7 +27,7 @@ const headings: Record<AppView, [string, string]> = {
 };
 
 export default function App() {
-  const [view, setView] = useState<AppView>("command");
+  const [view, setView] = useState<AppView>(() => { const target = window.location.hash.slice(1); return ["fleet", "agents", "activity", "ingestion"].includes(target) ? target as AppView : "command"; });
   const [metrics, setMetrics] = useState<FleetMetrics | null>(null);
   const [overview, setOverview] = useState<OperationsOverview | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
@@ -45,6 +45,9 @@ export default function App() {
   const [recommendationResult, setRecommendationResult] = useState<RecommendationResult | null>(null);
   const [intelligenceError, setIntelligenceError] = useState("");
   const [intelligenceLoading, setIntelligenceLoading] = useState(false);
+  const [task, setTask] = useState<AgentTask | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [organization, setOrganization] = useState(authMode === "local" ? "Entorno local" : "Organización seleccionada");
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [importing, setImporting] = useState(false);
   const [now, setNow] = useState(new Date());
@@ -71,6 +74,7 @@ export default function App() {
     else setMetrics(null);
     if (operations.status === "fulfilled") setOverview(operations.value);
     else setOverview(null);
+    if (page.status === "fulfilled" || totals.status === "fulfilled") setLastUpdated(new Date());
 
     const failure = page.status === "rejected" ? page.reason : totals.status === "rejected" ? totals.reason : health.status === "rejected" ? health.reason : undefined;
     if (failure) setError(failure instanceof Error ? failure.message : "No se pudieron cargar los datos de la API.");
@@ -78,16 +82,19 @@ export default function App() {
   }, [cursor, status, category, search]);
 
   useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (authMode === "cognito") void apiSession.tenants().then(items => { const found = items.find(item => item.tenant.tenantId === selectedTenantId()); if (found) setOrganization(found.tenant.name); }).catch(() => undefined); }, []);
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(timer); }, []);
 
   const runIntelligence = useCallback(async () => {
-    setIntelligenceLoading(true); setError(""); setIntelligenceError(""); setRecommendationResult(null);
+    setIntelligenceLoading(true); setError(""); setIntelligenceError(""); setRecommendationResult(null); setTask(null);
     try {
       const submitted = await fleetApi.submitRecommendationTask(`dashboard-${crypto.randomUUID()}`);
       let task = submitted.task;
+      setTask(task);
       for (let poll = 0; poll < 80 && !["SUCCEEDED", "FAILED", "DEAD_LETTER"].includes(task.state); poll += 1) {
         await new Promise((resolve) => window.setTimeout(resolve, 150));
         task = await fleetApi.task(task.taskId);
+        setTask(task);
       }
       if (task.state !== "SUCCEEDED" || !task.result) throw new Error(task.error?.message || "La ejecución no terminó correctamente.");
       setRecommendationResult(task.result);
@@ -132,7 +139,7 @@ export default function App() {
       <main className="content-area">
         {(error || notice) && <FeedbackBanner kind={error ? "error" : "success"} onDismiss={() => { setError(""); setNotice(""); }}>{error || notice}</FeedbackBanner>}
         <div className="page-intro"><div><div className="eyebrow">ARQUIFUSION / OPERACIONES</div><h1>{headings[view][0]}</h1><p>{headings[view][1]}</p></div>{view !== "ingestion" && <span className="data-origin"><span className={`origin-led ${connected ? "online" : checking ? "checking" : "offline"}`}/>{connected ? "DATOS DE API" : checking ? "REVISANDO API" : "API SIN CONEXIÓN"}</span>}</div>
-        {view === "command" && <CommandCenter metrics={metrics} machines={machines} total={metrics?.total ?? 0} loading={loading} result={recommendationResult} intelligenceLoading={intelligenceLoading} intelligenceError={intelligenceError} overview={overview} onRun={runIntelligence} onNavigate={navigate} onOpenMachine={openMachine}/>}
+        {view === "command" && <CommandCenter metrics={metrics} machines={machines} total={metrics?.total ?? 0} loading={loading} result={recommendationResult} intelligenceLoading={intelligenceLoading} intelligenceError={intelligenceError} overview={overview} task={task} connected={connected} checking={checking} lastUpdated={lastUpdated} organization={organization} onRun={runIntelligence} onNavigate={navigate} onOpenMachine={openMachine}/>}
         {view === "fleet" && <FleetView machines={machines} metrics={metrics} loading={loading} search={searchInput} setSearch={setSearchInput} onSearch={submitSearch} status={status} setStatus={(value) => { setCursorStack([]); setStatus(value); }} category={category} setCategory={(value) => { setCursorStack([]); setCategory(value); }} cursorStack={cursorStack} nextCursor={nextCursor} setCursorStack={setCursorStack} onOpenMachine={openMachine}/>} 
         {view === "agents" && <AgentCommand result={recommendationResult} loading={intelligenceLoading} onRun={runIntelligence} onOpenMachine={openMachine}/>} 
         {view === "activity" && <ActivityView overview={overview}/>}

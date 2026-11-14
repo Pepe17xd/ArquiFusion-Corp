@@ -11,3 +11,14 @@ cloud/aws/data/uploads/*
 __pycache__/
 *.py[cod]
 .pytest_cache/
+# Archivos locales de Playwright
+.playwright-mcp/
+playwright-report/
+test-results/
+
+# Capturas de desarrollo
+/screenshots/
+
+# Archivos temporales
+*.bak
+*.bak2
