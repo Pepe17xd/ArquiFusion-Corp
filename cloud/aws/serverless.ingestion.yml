@@ -10,12 +10,6 @@ provider:
     role: ${env:AWS_LAMBDA_ROLE_ARN}
   httpApi:
     id: ${env:HTTP_API_ID}
-    authorizers:
-      cognito:
-        type: jwt
-        identitySource: $request.header.Authorization
-        issuerUrl: ${env:COGNITO_ISSUER}
-        audience: ['${env:COGNITO_AUDIENCE}']
   environment:
     STORAGE_MODE: cloud
     AUTH_MODE: cognito
@@ -28,9 +22,9 @@ provider:
 functions:
   ingestCsv:
     handler: dist/api/domains/ingestion.ingestCsv
-    role: ${env:INGESTION_WRITE_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /ingest/csv, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}}]
+    role: ${env:INGESTION_WRITE_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /ingest/csv, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   ingestJson:
     handler: dist/api/domains/ingestion.ingestJson
-    role: ${env:INGESTION_WRITE_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /ingest/json, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}}]
+    role: ${env:INGESTION_WRITE_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /ingest/json, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]

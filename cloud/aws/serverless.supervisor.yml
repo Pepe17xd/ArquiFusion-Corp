@@ -10,12 +10,6 @@ provider:
     role: ${env:AWS_LAMBDA_ROLE_ARN}
   httpApi:
     id: ${env:HTTP_API_ID}
-    authorizers:
-      cognito:
-        type: jwt
-        identitySource: $request.header.Authorization
-        issuerUrl: ${env:COGNITO_ISSUER}
-        audience: ['${env:COGNITO_AUDIENCE}']
   environment:
     STORAGE_MODE: cloud
     AUTH_MODE: cognito
@@ -29,31 +23,31 @@ provider:
 functions:
   submitTask:
     handler: dist/api/domains/supervisor.submitTask
-    role: ${env:SUPERVISOR_SUBMIT_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /tasks, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}}]
+    role: ${env:SUPERVISOR_SUBMIT_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /tasks, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   tasks:
     handler: dist/api/domains/supervisor.tasks
-    role: ${env:SUPERVISOR_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /tasks, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:SUPERVISOR_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /tasks, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   getTask:
     handler: dist/api/domains/supervisor.getTask
-    role: ${env:SUPERVISOR_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: '/tasks/{taskId}', method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:SUPERVISOR_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: '/tasks/{taskId}', method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   taskEvents:
     handler: dist/api/domains/supervisor.taskEvents
-    role: ${env:SUPERVISOR_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /events, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:SUPERVISOR_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /events, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   operationsOverview:
     handler: dist/api/domains/supervisor.operationsOverview
-    role: ${env:SUPERVISOR_OVERVIEW_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /operations/overview, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:SUPERVISOR_OVERVIEW_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /operations/overview, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   runTask:
     handler: dist/api/domains/supervisor.runTask
-    role: ${env:SUPERVISOR_WORKER_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    role: ${env:SUPERVISOR_WORKER_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
     timeout: 300
   markTaskDeadLetter:
     handler: dist/api/domains/supervisor.markTaskDeadLetter
-    role: ${env:SUPERVISOR_WORKER_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    role: ${env:SUPERVISOR_WORKER_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
     timeout: 30
 resources:
   Resources:

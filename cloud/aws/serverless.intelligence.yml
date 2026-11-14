@@ -10,12 +10,6 @@ provider:
     role: ${env:AWS_LAMBDA_ROLE_ARN}
   httpApi:
     id: ${env:HTTP_API_ID}
-    authorizers:
-      cognito:
-        type: jwt
-        identitySource: $request.header.Authorization
-        issuerUrl: ${env:COGNITO_ISSUER}
-        audience: ['${env:COGNITO_AUDIENCE}']
   environment:
     STORAGE_MODE: cloud
     AUTH_MODE: cognito
@@ -27,9 +21,9 @@ provider:
 functions:
   intelligence:
     handler: dist/api/domains/intelligence.intelligence
-    role: ${env:INTELLIGENCE_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /intelligence/recommendations, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:INTELLIGENCE_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /intelligence/recommendations, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   agents:
     handler: dist/api/domains/intelligence.agents
-    role: ${env:INTELLIGENCE_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /agents, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:INTELLIGENCE_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /agents, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]

@@ -31,17 +31,17 @@ provider:
 functions:
   health:
     handler: dist/api/domains/platform.health
-    role: ${env:HEALTH_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    role: ${env:HEALTH_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
     events:
       - httpApi: {path: /health, method: GET}
   listTenants:
     handler: dist/api/domains/platform.listTenants
-    role: ${env:TENANT_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    role: ${env:TENANT_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
     events:
       - httpApi: {path: /tenants, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}
   createTenant:
     handler: dist/api/domains/platform.createTenant
-    role: ${env:TENANT_WRITE_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
+    role: ${env:TENANT_WRITE_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
     events:
       - httpApi: {path: /tenants, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
 resources:

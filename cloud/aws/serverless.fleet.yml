@@ -10,12 +10,6 @@ provider:
     role: ${env:AWS_LAMBDA_ROLE_ARN}
   httpApi:
     id: ${env:HTTP_API_ID}
-    authorizers:
-      cognito:
-        type: jwt
-        identitySource: $request.header.Authorization
-        issuerUrl: ${env:COGNITO_ISSUER}
-        audience: ['${env:COGNITO_AUDIENCE}']
   environment:
     STORAGE_MODE: cloud
     AUTH_MODE: cognito
@@ -27,13 +21,13 @@ provider:
 functions:
   listMachines:
     handler: dist/api/domains/fleet.listMachines
-    role: ${env:FLEET_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /machines, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:FLEET_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /machines, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   getMachine:
     handler: dist/api/domains/fleet.getMachine
-    role: ${env:FLEET_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: '/machines/{machineId}', method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:FLEET_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: '/machines/{machineId}', method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   metrics:
     handler: dist/api/domains/fleet.metrics
-    role: ${env:FLEET_READ_ROLE_ARN, ${env:AWS_LAMBDA_ROLE_ARN}}
-    events: [{httpApi: {path: /metrics, method: GET, authorizer: {name: cognito, scopes: [arquifusion/read]}}}]
+    role: ${env:FLEET_READ_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events: [{httpApi: {path: /metrics, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
