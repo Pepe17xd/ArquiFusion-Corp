@@ -26,7 +26,7 @@ export interface TenantContext {
 export interface TenantDirectory {
   resolve(userSub: string, requestedTenantId?: string): Promise<TenantContext>;
   listForUser(userSub: string): Promise<Array<{ tenant: Tenant; membership: TenantMembership }>>;
-  createTenant(userSub: string, name: string): Promise<{ tenant: Tenant; membership: TenantMembership }>;
+  createTenant(userSub: string, name: string, idempotencyKey: string): Promise<{ tenant: Tenant; membership: TenantMembership }>;
 }
 
 export class AuthenticationError extends Error {
@@ -35,4 +35,8 @@ export class AuthenticationError extends Error {
 
 export class TenantAccessError extends Error {
   constructor(message = "The user is not a member of the requested tenant") { super(message); this.name = "TenantAccessError"; }
+}
+
+export class TenantConflictError extends Error {
+  constructor(message = "The organization request conflicts with an existing account state") { super(message); this.name = "TenantConflictError"; }
 }

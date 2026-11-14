@@ -56,9 +56,13 @@ export interface TaskStore {
 }
 
 export interface TaskDispatcher {
-  dispatch(input: { tenantId: string; taskId: string }): Promise<void>;
+  dispatch(input: { tenantId: string; taskId: string; executionId: string; correlationId: string }): Promise<void>;
 }
 
 export class PermanentTaskError extends Error {
   constructor(readonly code: string, message: string) { super(message); this.name = "PermanentTaskError"; }
+}
+
+export class TaskDispatchError extends Error {
+  constructor() { super("Durable workflow dispatch failed; inspect task state before retrying"); this.name = "TaskDispatchError"; }
 }

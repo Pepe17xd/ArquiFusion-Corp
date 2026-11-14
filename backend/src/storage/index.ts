@@ -9,6 +9,7 @@ import { LocalTenantDirectory } from "../tenancy/local-tenant-directory";
 import { DynamoTenantDirectory } from "../tenancy/dynamo-tenant-directory";
 import { DynamoTaskStore } from "../supervisor/dynamo-task-store";
 import { StepFunctionsTaskDispatcher } from "../supervisor/step-functions-dispatcher";
+import { createCognitoAccessTokenVerifier } from "../security/cognito-token-verifier";
 
 export function createStorage() {
   const config = loadConfig();
@@ -23,5 +24,6 @@ export function createStorage() {
     : new LocalTenantDirectory(join(dirname(config.localDataFile), "tenants.json"));
   const tasks = config.storageMode === "cloud" ? new DynamoTaskStore(config.tasksTable!) : undefined;
   const dispatcher = config.storageMode === "cloud" && config.taskStateMachineArn ? new StepFunctionsTaskDispatcher(config.taskStateMachineArn) : undefined;
-  return { machines, originals, tenants, authMode: config.authMode, storageMode: config.storageMode, tasks, dispatcher };
+  const tokenVerifier = config.authMode === "cognito" ? createCognitoAccessTokenVerifier({ issuer: config.cognitoIssuer!, clientId: config.cognitoAudience! }) : undefined;
+  return { machines, originals, tenants, authMode: config.authMode, storageMode: config.storageMode, tasks, dispatcher, tokenVerifier };
 }

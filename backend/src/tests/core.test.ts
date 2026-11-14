@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { normalizeMachine, ValidationError, type Machine } from "../core/machine";
 import { IngestionService, MAX_IMPORT_BYTES, normalizeRows, parseCsv } from "../ingestion/service";
@@ -11,12 +12,30 @@ import { LocalOriginalFileStore } from "../storage/local-original-file-store";
 import type { MachineRepository } from "../storage/contracts";
 import { decodeDynamoKey, encodeDynamoKey } from "../storage/dynamo-machine-repository";
 import { createLocalServer } from "../local-server";
+import { loadConfig } from "../core/config";
+import { ConfigurationError } from "../core/errors";
 
 const sample = {
   machineId: "EXC-001", model: "Excavator X200", category: "Excavadora", location: "Zona A",
   status: "operational", operatingHours: 1250, temperature: 85, vibration: 4.2, pressure: 180, fuelConsumption: 18,
 };
-const testDataDirectory = resolve(__dirname, "../../data");
+const testDataDirectory = tmpdir();
+
+test("local configuration is explicit and never selects Cognito or cloud adapters implicitly", () => {
+  const config = loadConfig({});
+  assert.equal(config.storageMode, "local");
+  assert.equal(config.authMode, "local");
+  assert.throws(() => loadConfig({ STORAGE_MODE: "local", AUTH_MODE: "cognito", TENANTS_TABLE: "test", COGNITO_ISSUER: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_test", COGNITO_AUDIENCE: "test" }), ConfigurationError);
+});
+
+test("cloud configuration fails closed unless durable storage, Cognito and HTTPS frontend origin are explicit", () => {
+  const base = { STORAGE_MODE: "cloud", AUTH_MODE: "cognito", MACHINES_TABLE: "machines", TENANTS_TABLE: "tenants", TASKS_TABLE: "tasks", TASK_STATE_MACHINE_ARN: "arn:aws:states:us-east-1:123456789012:stateMachine:test", UPLOADS_BUCKET: "uploads", COGNITO_ISSUER: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Test123", COGNITO_AUDIENCE: "public-client", WEB_ORIGIN: "https://console.example.test" };
+  assert.equal(loadConfig(base).storageMode, "cloud");
+  assert.throws(() => loadConfig({ ...base, WEB_ORIGIN: "*" }), ConfigurationError);
+  assert.throws(() => loadConfig({ ...base, COGNITO_ISSUER: "https://issuer.example.test/pool" }), ConfigurationError);
+  assert.throws(() => loadConfig({ ...base, COGNITO_ISSUER: "https://cognito-idp.us-east-1.amazonaws.com:8443/us-east-1_Test123" }), ConfigurationError);
+  assert.throws(() => loadConfig({ ...base, TASK_STATE_MACHINE_ARN: "" }), ConfigurationError);
+});
 
 test("CSV and JSON pass through one normalizer and produce compatible machines", () => {
   const csv = parseCsv("machineId,model,category,location,status,operatingHours\nEXC-001,Excavator X200,Excavadora,Zona A,operational,1250");
@@ -153,8 +172,12 @@ test("local HTTP server exercises ingestion, list, detail and metrics through th
     const address = server.address();
     assert.ok(address && typeof address !== "string");
     const base = "http://127.0.0.1:" + address.port;
-    const health = await fetch(base + "/health").then((response) => response.json()) as any;
+    const healthResponse = await fetch(base + "/health");
+    const health = await healthResponse.json() as any;
     assert.equal(health.data.status, "ok");
+    assert.ok(healthResponse.headers.get("x-request-id"));
+    const secondHealth = await fetch(base + "/health");
+    assert.notEqual(healthResponse.headers.get("x-request-id"), secondHealth.headers.get("x-request-id"));
     const imported = await fetch(base + "/ingest/json", {
       method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(sample),
     });

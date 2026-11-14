@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { AgentSupervisor } from "../supervisor/supervisor";
 import { PermanentTaskError } from "../supervisor/contracts";
@@ -13,9 +14,10 @@ import { LocalMachineRepository } from "../storage/local-machine-repository";
 import type { IntelligenceProvider } from "../intelligence/contracts";
 import { createLocalServer } from "../local-server";
 import { LocalOriginalFileStore } from "../storage/local-original-file-store";
+import { StepFunctionsTaskDispatcher } from "../supervisor/step-functions-dispatcher";
 
-const tempRoot = resolve(__dirname, "../../data");
-const noMachines = () => new LocalMachineRepository(resolve(tempRoot, ".test-empty-machines.json"));
+const tempRoot = tmpdir();
+const noMachines = (file: string) => new LocalMachineRepository(file);
 
 test("shared v1 event envelope validates and rejects unknown fields", () => {
   const event = createEvent({ eventType: "AgentTaskRequested", tenantId: "local-demo", taskId: "t", executionId: "x", correlationId: "c", payload: {} });
@@ -38,9 +40,40 @@ test("agent registry exposes only the deterministic fleet workflow as operationa
 test("supervisor refuses tasks outside the explicit capability registry", async () => {
   const dir = await mkdtemp(join(tempRoot, ".test-supervisor-capability-"));
   try {
-    const supervisor = new AgentSupervisor(new LocalTaskStore(join(dir, "supervisor.json")), noMachines());
+    const supervisor = new AgentSupervisor(new LocalTaskStore(join(dir, "supervisor.json")), noMachines(join(dir, "machines.json")));
     await assert.rejects(supervisor.submit({ tenantId: "local-demo", taskType: "inventory.recommendations" }), PermanentTaskError);
     assert.equal((await supervisor.list("local-demo")).length, 0);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("Step Functions dispatcher sends stable execution identity and tenant context", async () => {
+  const sent: import("@aws-sdk/client-sfn").StartExecutionCommand[] = [];
+  const dispatcher = new StepFunctionsTaskDispatcher("arn:aws:states:us-east-1:123456789012:stateMachine:test", {
+    send: async (command) => { sent.push(command); return {}; },
+  });
+  const input = { tenantId: "tenant-a", taskId: "task-1", executionId: "execution-1", correlationId: "request-1" };
+  await dispatcher.dispatch(input);
+  assert.equal(sent.length, 1);
+  assert.equal(sent[0].input.name, input.executionId);
+  assert.equal(sent[0].input.stateMachineArn, "arn:aws:states:us-east-1:123456789012:stateMachine:test");
+  assert.deepEqual(JSON.parse(sent[0].input.input ?? "{}"), input);
+});
+
+test("dispatcher failures persist a terminal task and idempotent replay does not dispatch again", async () => {
+  const dir = await mkdtemp(join(tempRoot, ".test-supervisor-dispatch-failure-"));
+  try {
+    let dispatches = 0;
+    const store = new LocalTaskStore(join(dir, "supervisor.json"));
+    const supervisor = new AgentSupervisor(store, noMachines(join(dir, "machines.json")), undefined, undefined, {
+      dispatch: async () => { dispatches += 1; throw new Error("transport unavailable"); },
+    });
+    const first = await supervisor.submit({ tenantId: "tenant-a", taskType: "fleet.recommendations", idempotencyKey: "retry-safe" });
+    const replay = await supervisor.submit({ tenantId: "tenant-a", taskType: "fleet.recommendations", idempotencyKey: "retry-safe" });
+    assert.equal(first.task.state, "FAILED");
+    assert.equal(first.task.error?.code, "DISPATCH_FAILURE");
+    assert.equal(replay.created, false);
+    assert.equal(replay.task.taskId, first.task.taskId);
+    assert.equal(dispatches, 1);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -50,7 +83,7 @@ test("supervisor persists, routes and deduplicates a supported task", async () =
     let runs = 0;
     const provider: IntelligenceProvider = { recommend: async () => { runs += 1; return { generatedAt: new Date().toISOString(), recommendations: [], source: "deterministic-rules" }; } };
     const store = new LocalTaskStore(join(dir, "supervisor.json"));
-    const supervisor = new AgentSupervisor(store, noMachines(), provider, async () => undefined);
+    const supervisor = new AgentSupervisor(store, noMachines(join(dir, "machines.json")), provider, async () => undefined);
     const first = await supervisor.submit({ tenantId: "local-demo", taskType: "fleet.recommendations", idempotencyKey: "same-request" });
     const duplicate = await supervisor.submit({ tenantId: "local-demo", taskType: "fleet.recommendations", idempotencyKey: "same-request" });
     assert.equal(first.created, true);
@@ -75,7 +108,7 @@ test("transient provider failures retry to the local dead-letter state", async (
   try {
     let runs = 0;
     const provider: IntelligenceProvider = { recommend: async () => { runs += 1; throw new Error("private provider detail"); } };
-    const supervisor = new AgentSupervisor(new LocalTaskStore(join(dir, "supervisor.json")), noMachines(), provider, async () => undefined);
+    const supervisor = new AgentSupervisor(new LocalTaskStore(join(dir, "supervisor.json")), noMachines(join(dir, "machines.json")), provider, async () => undefined);
     const submitted = await supervisor.submit({ tenantId: "local-demo", taskType: "fleet.recommendations", idempotencyKey: "retry-request" });
     const task = await waitForTerminal(supervisor, submitted.task.taskId);
     assert.equal(task.state, "DEAD_LETTER");

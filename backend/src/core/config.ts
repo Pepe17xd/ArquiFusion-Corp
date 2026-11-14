@@ -14,6 +14,21 @@ export interface AppConfig {
   taskStateMachineArn?: string;
   cognitoIssuer?: string;
   cognitoAudience?: string;
+  webOrigin?: string;
+}
+
+function isCognitoIssuer(value: string) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "https:" && !url.username && !url.password && !url.port && !url.search && !url.hash
+      && /^cognito-idp\.[a-z0-9-]+\.amazonaws\.com(?:\.cn)?$/i.test(url.hostname)
+      && /^\/[a-z0-9-]+_[A-Za-z0-9]+$/.test(url.pathname);
+  } catch { return false; }
+}
+
+function isSecureOrigin(value: string) {
+  try { const url = new URL(value); return url.protocol === "https:" && url.origin === value && url.pathname === "/" && !url.search && !url.hash; }
+  catch { return false; }
 }
 
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
@@ -22,13 +37,16 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
   if (storageMode !== "local" && storageMode !== "cloud") {
     throw new ConfigurationError("STORAGE_MODE must be local or cloud");
   }
-  if (storageMode === "cloud" && (!env.MACHINES_TABLE || !env.UPLOADS_BUCKET || !env.TENANTS_TABLE || !env.TASKS_TABLE)) {
-    throw new ConfigurationError("MACHINES_TABLE, TENANTS_TABLE, TASKS_TABLE and UPLOADS_BUCKET are required in cloud mode");
-  }
+  if (storageMode === "cloud" && (!env.MACHINES_TABLE || !env.UPLOADS_BUCKET || !env.TENANTS_TABLE || !env.TASKS_TABLE || !env.TASK_STATE_MACHINE_ARN)) throw new ConfigurationError("MACHINES_TABLE, TENANTS_TABLE, TASKS_TABLE, UPLOADS_BUCKET and TASK_STATE_MACHINE_ARN are required in cloud mode");
   if (authMode !== "local" && authMode !== "cognito") throw new ConfigurationError("AUTH_MODE must be local or cognito");
   if (storageMode === "cloud" && authMode !== "cognito") throw new ConfigurationError("Cloud mode requires AUTH_MODE=cognito");
+  if (storageMode === "local" && authMode !== "local") throw new ConfigurationError("Local mode requires AUTH_MODE=local and never contacts Cognito");
   if (authMode === "cognito" && (!env.TENANTS_TABLE || !env.COGNITO_ISSUER || !env.COGNITO_AUDIENCE)) {
     throw new ConfigurationError("TENANTS_TABLE, COGNITO_ISSUER and COGNITO_AUDIENCE are required for Cognito authentication");
+  }
+  if (authMode === "cognito" && !isCognitoIssuer(env.COGNITO_ISSUER!)) throw new ConfigurationError("COGNITO_ISSUER must be the HTTPS issuer URL of an Amazon Cognito User Pool");
+  if (storageMode === "cloud" && (!env.WEB_ORIGIN || !isSecureOrigin(env.WEB_ORIGIN))) {
+    throw new ConfigurationError("WEB_ORIGIN must be one explicit HTTPS origin in cloud mode");
   }
   return {
     storageMode,
@@ -43,5 +61,6 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): AppConfig {
     taskStateMachineArn: env.TASK_STATE_MACHINE_ARN,
     cognitoIssuer: env.COGNITO_ISSUER,
     cognitoAudience: env.COGNITO_AUDIENCE,
+    webOrigin: env.WEB_ORIGIN ?? "http://localhost:5173",
   };
 }
