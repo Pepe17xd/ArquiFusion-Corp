@@ -1,3 +1,28 @@
+.auth-shell { min-height: 100vh; position: relative; display: grid; place-items: center; overflow: hidden; padding: 28px; color: var(--text); background: radial-gradient(ellipse at 72% 48%, #11333c88, transparent 32%), linear-gradient(130deg, #070b0e, #0a1218 56%, #071015); }
+.auth-panel { position: relative; z-index: 2; width: min(100%, 440px); padding: 38px; border: 1px solid #29424a; border-radius: 8px; background: #0b1318e8; box-shadow: 0 28px 90px #0009; }
+.auth-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 44px; letter-spacing: 2.3px; font-size: 13px; }
+.auth-brand img { width: 35px; height: 35px; filter: drop-shadow(0 0 8px #67dbe533); }
+.auth-kicker { display: block; color: var(--cyan); font-size: 9px; font-weight: 700; letter-spacing: 2px; }
+.auth-panel h1 { margin: 12px 0; font-size: clamp(27px, 5vw, 38px); line-height: 1.1; letter-spacing: -.7px; }
+.auth-panel p { color: #9aaab0; font-size: 13px; line-height: 1.7; margin: 0 0 25px; }
+.auth-primary, .auth-secondary { width: 100%; min-height: 44px; margin: 7px 0; border-radius: 4px; font-weight: 650; }
+.auth-primary { border: 1px solid #70dcea; background: #76dce7; color: #071114; }
+.auth-primary:hover:not(:disabled) { background: #a0edf3; }
+.auth-secondary { border: 1px solid #334a52; background: #111c21; color: var(--text); }
+.auth-panel small { display: block; margin-top: 17px; color: #76868c; font-size: 10px; line-height: 1.6; }
+.auth-error { margin: 14px 0; padding: 11px 12px; color: #ffd2cd; border: 1px solid #783f3b; border-radius: 4px; background: #341b1c88; font-size: 12px; line-height: 1.5; }
+.auth-ambient { position: absolute; right: 7%; width: min(42vw, 520px); aspect-ratio: 1; border-radius: 50%; opacity: .42; }
+.auth-orbit { position: absolute; inset: 0; border: 1px solid #68d8e622; border-radius: 50%; transform: rotate(-28deg) scaleY(.6); }
+.orbit-b { transform: rotate(48deg) scaleY(.76); border-color: #58b5cc22; }
+.auth-core { position: absolute; inset: 38%; border-radius: 50%; background: radial-gradient(circle, #75e2eb88, #1a667455 45%, transparent 75%); box-shadow: 0 0 70px #31afc733; }
+.tenant-options { display: grid; gap: 8px; margin: 22px 0; }
+.tenant-options button { display: grid; gap: 5px; text-align: left; padding: 13px; border: 1px solid #30454c; border-radius: 4px; background: #101b20; color: var(--text); }
+.tenant-options button:hover { border-color: var(--cyan); }
+.tenant-options small { margin: 0; }
+.tenant-create { display: grid; gap: 9px; margin-top: 24px; }
+.tenant-create label { color: #aebdc2; font-size: 11px; }
+.tenant-create input { min-height: 42px; padding: 0 11px; border: 1px solid #30454c; border-radius: 4px; background: #080f13; color: var(--text); }
+.auth-link { margin-top: 14px; padding: 8px 0; border: 0; background: transparent; color: var(--cyan); }
 :root {
   font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   color: #e7eef1;
@@ -184,3 +209,4 @@ button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focu
 @media (max-width: 1000px) { .ecosystem-stage { grid-template-columns: minmax(0,1fr) minmax(275px,320px) minmax(0,1fr); column-gap: 8px; }.ecosystem-role { width: min(100%,220px); padding: 7px; gap: 6px; }.role-specialty { display: none; } }
 @media (max-width: 850px) { .ecosystem-panel { padding-inline: 15px; }.ecosystem-stage { grid-template-columns: repeat(2,minmax(0,1fr)); grid-template-rows: auto 270px auto auto auto; grid-template-areas: "core core" "core core" "coord maintenance" "fleet inventory" "technicians incidents"; gap: 9px; min-height: auto; margin-top: 14px; }.ecosystem-links { display: none; }.brain-core { grid-row: 1 / span 2; grid-column: 1 / span 2; width: min(100%,370px); height: 270px; justify-self: center; }.ecosystem-role { width: 100%; min-height: 60px; }.ecosystem-role svg { width: 38px; height: 38px; flex-basis: 38px; }.role-coordinator,.role-maintenance,.role-fleet,.role-inventory,.role-technicians,.role-incidents { justify-self: stretch; }.ecosystem-detail { margin-top: 11px; } }
 @media (max-width: 600px) { .ecosystem-panel { margin-inline: -2px; padding: 14px 10px 11px; }.ecosystem-heading { display: block; }.ecosystem-heading h2 { font-size: 15px; }.ecosystem-heading p { max-width: 340px; font-size: 9px; line-height: 1.5; }.ecosystem-key { margin-top: 8px; }.ecosystem-stage { grid-template-rows: 246px repeat(3,minmax(54px,auto)); gap: 7px; }.brain-core { grid-row: 1; grid-column: 1 / span 2; width: min(100%,360px); height: 246px; padding: 9px; }.artificial-brain { max-height: 156px; }.brain-core-bottom b { font-size: 8px; }.brain-core-bottom small { max-width: 155px; font-size: 7px; }.brain-run-button { padding: 6px 7px; }.brain-run-button span { font-size: 8px; }.ecosystem-role { min-height: 57px; gap: 5px; padding: 5px; }.ecosystem-role svg { width: 33px; height: 33px; flex-basis: 33px; }.role-copy b { font-size: 8px; }.role-copy small { font-size: 7px; }.ecosystem-detail { align-items: flex-start; gap: 7px; padding: 7px; }.ecosystem-detail>svg { width: 34px; height: 34px; flex-basis: 34px; }.ecosystem-detail .eyebrow { font-size: 6px; }.ecosystem-detail b { font-size: 9px; }.ecosystem-detail p { font-size: 7px; }.planned-pill { font-size: 6px; padding: 4px; }.ecosystem-note { font-size: 7px; } }
+@media (max-width: 560px) { .auth-shell { padding: 16px; }.auth-panel { padding: 26px 22px; }.auth-brand { margin-bottom: 34px; }.auth-ambient { width: 88vw; right: -35%; opacity: .22; } }

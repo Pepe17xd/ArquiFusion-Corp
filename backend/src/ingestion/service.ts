@@ -31,12 +31,12 @@ export function parseCsv(content: string): unknown[] {
   return rows;
 }
 
-export function normalizeRows(rows: unknown, source: IngestionSource) {
+export function normalizeRows(rows: unknown, source: IngestionSource, tenantId: string) {
   const list = Array.isArray(rows) ? rows : [rows];
   const accepted: Machine[] = [];
   const rejected: IngestionResult["rejected"] = [];
   list.forEach((row, index) => {
-    try { accepted.push(normalizeMachine(row, source)); }
+    try { accepted.push(normalizeMachine(row, source, tenantId)); }
     catch (error) {
       rejected.push({ row: index + 1, errors: error instanceof ValidationError ? error.issues : ["Invalid record"] });
     }
@@ -47,13 +47,13 @@ export function normalizeRows(rows: unknown, source: IngestionSource) {
 export class IngestionService {
   constructor(private readonly repository: MachineRepository, private readonly originals: OriginalFileStore) {}
 
-  async ingest(content: string, source: IngestionSource, contentType: string): Promise<IngestionResult> {
+  async ingest(content: string, source: IngestionSource, contentType: string, tenantId: string): Promise<IngestionResult> {
     if (Buffer.byteLength(content, "utf8") > MAX_IMPORT_BYTES) throw new ValidationError(["Import file exceeds the 8 MB limit"]);
     const rows = source === "csv" ? parseCsv(content) : parseJson(content);
-    const normalized = normalizeRows(rows, source);
+    const normalized = normalizeRows(rows, source, tenantId);
     const sha256 = createHash("sha256").update(content).digest("hex");
     const originalFileUri = await this.originals.saveOriginal({
-      content, contentType, extension: source, sha256,
+      tenantId, content, contentType, extension: source, sha256,
     });
     for (const machine of normalized.accepted) await this.repository.upsert(machine);
     return { ...normalized, originalFileUri };

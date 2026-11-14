@@ -69,20 +69,37 @@ export interface OperationsOverview {
   recentEvents: AgentEvent[]; domains: { inventory: string; technicianAssignment: string; incidents: string };
 }
 
+import { accessToken, authMode, selectedTenantId, clearSession, type TenantChoice } from "../auth/session";
+
 const apiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
-  try { response = await fetch(apiBase + path, init); }
+  try {
+    const headers = new Headers(init?.headers);
+    const token = authMode === "cognito" ? await accessToken() : undefined;
+    if (token) headers.set("authorization", `Bearer ${token}`);
+    const tenantId = authMode === "cognito" ? selectedTenantId() : undefined;
+    if (tenantId) headers.set("x-tenant-id", tenantId);
+    response = await fetch(apiBase + path, { ...init, headers });
+  }
   catch { throw new Error("No se pudo conectar con la API."); }
 
   const envelope = await response.json().catch(() => ({}));
   if (!response.ok) {
+    if (response.status === 401 && authMode === "cognito") {
+      clearSession(); window.dispatchEvent(new Event("arquifusion:session-expired"));
+    }
     const details = envelope?.data?.details;
     throw new Error(Array.isArray(details) ? details.join("; ") : envelope?.data?.error || "HTTP " + response.status);
   }
   return envelope.data as T;
 }
+
+export const apiSession = {
+  tenants: () => request<TenantChoice[]>("/tenants"),
+  createTenant: (name: string) => request<TenantChoice>("/tenants", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ name }) }),
+};
 
 export const fleetApi = {
   health: () => request<{ status: "ok" }>("/health"),

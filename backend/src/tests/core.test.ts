@@ -20,8 +20,8 @@ const testDataDirectory = resolve(__dirname, "../../data");
 
 test("CSV and JSON pass through one normalizer and produce compatible machines", () => {
   const csv = parseCsv("machineId,model,category,location,status,operatingHours\nEXC-001,Excavator X200,Excavadora,Zona A,operational,1250");
-  const fromCsv = normalizeRows(csv, "csv").accepted[0];
-  const fromJson = normalizeRows(sample, "json").accepted[0];
+  const fromCsv = normalizeRows(csv, "csv", "local-demo").accepted[0];
+  const fromJson = normalizeRows(sample, "json", "local-demo").accepted[0];
   assert.equal(fromCsv.machineId, fromJson.machineId);
   assert.equal(fromCsv.operatingHours, fromJson.operatingHours);
   assert.equal(fromCsv.dataSource, "csv");
@@ -29,8 +29,8 @@ test("CSV and JSON pass through one normalizer and produce compatible machines",
 });
 
 test("normalization reports required fields, invalid status and invalid numeric values", () => {
-  assert.throws(() => normalizeMachine({ machineId: "x" }, "json"), ValidationError);
-  const result = normalizeRows([{ ...sample, status: "unknown", operatingHours: -1 }], "json");
+  assert.throws(() => normalizeMachine({ machineId: "x" }, "json", "local-demo"), ValidationError);
+  const result = normalizeRows([{ ...sample, status: "unknown", operatingHours: -1 }], "json", "local-demo");
   assert.equal(result.rejected.length, 1);
   assert.match(result.rejected[0].errors.join(" "), /status/);
   assert.match(result.rejected[0].errors.join(" "), /operatingHours/);
@@ -42,20 +42,27 @@ test("CSV reports missing required headers and malformed input", () => {
   assert.throws(() => parseCsv('machineId,model,category,location,status\n"unterminated'), (error) => error instanceof ValidationError && error.issues[0].includes("Invalid CSV"));
 });
 
+test("CSV parsing keeps duplicate __proto__ headers from replacing the record prototype", () => {
+  const rows = parseCsv("machineId,model,category,location,status,__proto__,__proto__\nEQ-1,Loader,Loader,Yard,operational,first,second");
+  assert.equal(Object.getPrototypeOf(rows[0]), Object.prototype);
+  assert.equal(Object.hasOwn(Object.prototype, "polluted"), false);
+});
+
 test("local repository upserts by ID, filters and paginates deterministically", async () => {
   const dir = await mkdtemp(join(testDataDirectory, ".test-repo-"));
   try {
     const repo = new LocalMachineRepository(join(dir, "machines.json"));
-    await repo.upsert(normalizeMachine(sample, "json"));
-    await repo.upsert(normalizeMachine({ ...sample, machineId: "BLD-002", status: "maintenance", location: "Zona B" }, "json"));
-    await repo.upsert(normalizeMachine({ ...sample, location: "Zona C" }, "json"));
-    assert.equal((await repo.list(10)).items.length, 2);
-    assert.equal((await repo.get("EXC-001"))?.location, "Zona C");
-    const filtered = await repo.list(10, undefined, { status: "maintenance" });
+    await repo.upsert(normalizeMachine(sample, "json", "local-demo"));
+    await repo.upsert(normalizeMachine({ ...sample, machineId: "BLD-002", status: "maintenance", location: "Zona B" }, "json", "local-demo"));
+    await repo.upsert(normalizeMachine({ ...sample, location: "Zona C" }, "json", "local-demo"));
+    assert.equal((await repo.list("local-demo", 10)).items.length, 2);
+    assert.equal((await repo.get("local-demo", "EXC-001"))?.location, "Zona C");
+    assert.equal(await repo.get("tenant-other", "EXC-001"), undefined);
+    const filtered = await repo.list("local-demo", 10, undefined, { status: "maintenance" });
     assert.equal(filtered.items[0].machineId, "BLD-002");
     assert.equal(filtered.nextCursor, undefined);
-    const page1 = await repo.list(1);
-    const page2 = await repo.list(1, page1.nextCursor);
+    const page1 = await repo.list("local-demo", 1);
+    const page2 = await repo.list("local-demo", 1, page1.nextCursor);
     assert.notEqual(page1.items[0].machineId, page2.items[0].machineId);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
@@ -65,7 +72,7 @@ test("local repository exposes corrupt storage instead of silently returning an 
   try {
     const file = join(dir, "machines.json");
     await writeFile(file, "not json");
-    await assert.rejects(new LocalMachineRepository(file).list(10), SyntaxError);
+    await assert.rejects(new LocalMachineRepository(file).list("local-demo", 10), SyntaxError);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -75,13 +82,13 @@ test("CSV and JSON ingestion archive originals and report per-row errors while u
     const repo = new LocalMachineRepository(join(dir, "machines.json"));
     const service = new IngestionService(repo, new LocalOriginalFileStore(join(dir, "uploads")));
     const json = JSON.stringify([sample, { ...sample, machineId: "", status: "bad" }]);
-    const first = await service.ingest(json, "json", "application/json");
-    const second = await service.ingest(json, "json", "application/json");
+    const first = await service.ingest(json, "json", "application/json", "local-demo");
+    const second = await service.ingest(json, "json", "application/json", "local-demo");
     assert.equal(first.processed, 2);
     assert.equal(first.accepted.length, 1);
     assert.equal(first.rejected.length, 1);
     assert.equal(first.originalFileUri, second.originalFileUri);
-    assert.equal((await repo.list(10)).items.length, 1);
+    assert.equal((await repo.list("local-demo", 10)).items.length, 1);
     assert.equal(JSON.parse(await readFile(join(dir, "machines.json"), "utf8")).length, 1);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
@@ -93,17 +100,17 @@ test("fleet metrics aggregate every repository page, not just the first page", a
     status: index % 2 ? "operational" : "maintenance",
     fuelConsumption: 10,
     operatingHours: 100,
-  }, "json"));
+  }, "json", "local-demo"));
   const repository: MachineRepository = {
     upsert: async () => undefined,
-    get: async (id) => machines.find((machine) => machine.machineId === id),
-    list: async (limit, cursor) => {
+    get: async (tenantId, id) => machines.find((machine) => machine.tenantId === tenantId && machine.machineId === id),
+    list: async (tenantId, limit, cursor) => {
       const offset = cursor ? Number(cursor) : 0;
-      const items = machines.slice(offset, offset + limit);
+      const items = machines.filter((machine) => machine.tenantId === tenantId).slice(offset, offset + limit);
       return { items, nextCursor: offset + limit < machines.length ? String(offset + limit) : undefined };
     },
   };
-  const metrics = await getFleetMetrics(repository);
+  const metrics = await getFleetMetrics(repository, "local-demo");
   assert.equal(metrics.total, 205);
   assert.equal(metrics.operational, 102);
   assert.equal(metrics.maintenance, 103);
@@ -112,7 +119,7 @@ test("fleet metrics aggregate every repository page, not just the first page", a
 });
 
 test("LangGraph runs the deterministic fleet workflow and returns evidence-backed recommendations", async () => {
-  const machine = normalizeMachine({ ...sample, status: "alert", temperature: 94, vibration: 5.4 }, "json");
+  const machine = normalizeMachine({ ...sample, status: "alert", temperature: 94, vibration: 5.4 }, "json", "local-demo");
   const result = await new LangGraphFleetIntelligence().recommend({ machines: [machine] });
   assert.equal(result.source, "deterministic-rules");
   assert.equal(result.recommendations.length, 3);
@@ -121,7 +128,7 @@ test("LangGraph runs the deterministic fleet workflow and returns evidence-backe
 });
 
 test("DynamoDB pagination cursors preserve the complete LastEvaluatedKey", () => {
-  const key = { machineId: "EXC-001", tenantId: "tenant-a", createdAt: "2026-01-01T00:00:00Z" };
+  const key = { pk: "tenant-a", sk: "EXC-001" };
   assert.deepEqual(decodeDynamoKey(encodeDynamoKey(key)), key);
   assert.throws(() => decodeDynamoKey("not-a-cursor"), (error) => error instanceof ValidationError && error.issues[0] === "Invalid pagination cursor");
 });
@@ -130,7 +137,7 @@ test("file ingestion enforces the API size limit", async () => {
   const dir = await mkdtemp(join(testDataDirectory, ".test-size-"));
   try {
     const service = new IngestionService(new LocalMachineRepository(join(dir, "machines.json")), new LocalOriginalFileStore(join(dir, "uploads")));
-    await assert.rejects(service.ingest("x".repeat(MAX_IMPORT_BYTES + 1), "json", "application/json"), ValidationError);
+    await assert.rejects(service.ingest("x".repeat(MAX_IMPORT_BYTES + 1), "json", "application/json", "local-demo"), ValidationError);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -139,6 +146,7 @@ test("local HTTP server exercises ingestion, list, detail and metrics through th
   const server = createLocalServer({
     machines: new LocalMachineRepository(join(dir, "machines.json")),
     originals: new LocalOriginalFileStore(join(dir, "uploads")),
+    tenants: new (await import("../tenancy/local-tenant-directory")).LocalTenantDirectory(join(dir, "tenants.json")),
   });
   try {
     await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
@@ -178,7 +186,7 @@ test("metric aggregate handles an empty fleet and missing telemetry", () => {
   assert.equal(empty.total, 0);
   assert.equal(empty.availabilityPercent, 0);
   assert.equal(empty.averageFuelConsumption, undefined);
-  const noTelemetry = aggregateFleetMetrics([normalizeMachine({ ...sample, fuelConsumption: undefined, operatingHours: undefined }, "json")]);
+  const noTelemetry = aggregateFleetMetrics([normalizeMachine({ ...sample, fuelConsumption: undefined, operatingHours: undefined }, "json", "local-demo")]);
   assert.equal(noTelemetry.totalFuelConsumption, 0);
   assert.equal(noTelemetry.averageFuelConsumption, undefined);
 });

@@ -1,6 +1,7 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 import { ValidationError } from "../core/machine";
 import { NotFoundError } from "../core/errors";
+import { AuthenticationError, TenantAccessError } from "../tenancy/contracts";
 
 export function jsonResponse(statusCode: number, data: unknown): APIGatewayProxyResultV2 {
   return {
@@ -20,6 +21,8 @@ export async function handleRequest(operation: () => Promise<unknown>): Promise<
   catch (error) {
     if (error instanceof ValidationError) return jsonResponse(400, { error: "Validation error", details: error.issues });
     if (error instanceof NotFoundError) return jsonResponse(404, { error: error.message });
+    if (error instanceof AuthenticationError) return jsonResponse(401, { error: error.message });
+    if (error instanceof TenantAccessError) return jsonResponse(403, { error: error.message });
     console.error("api_request_failed", { errorName: error instanceof Error ? error.name : "UnknownError" });
     return jsonResponse(500, { error: "Internal server error" });
   }

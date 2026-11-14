@@ -1,0 +1,75 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: ARQUIFUSION Cognito identity foundation. Deploy separately before the API stack.
+Parameters:
+  DomainPrefix:
+    Type: String
+    MinLength: 1
+    MaxLength: 63
+    AllowedPattern: '^[a-z0-9-]+$'
+  CallbackUrl:
+    Type: String
+    Default: http://localhost:5173/auth/callback
+  LogoutUrl:
+    Type: String
+    Default: http://localhost:5173/
+Resources:
+  ArquiFusionUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: arquifusion-users
+      UsernameAttributes: [email]
+      AutoVerifiedAttributes: [email]
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          RequireUppercase: true
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - {Name: verified_email, Priority: 1}
+  ArquiFusionApiScopes:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      Identifier: arquifusion
+      Name: ARQUIFUSION API
+      UserPoolId: {Ref: ArquiFusionUserPool}
+      Scopes:
+        - {ScopeName: read, ScopeDescription: Read tenant-scoped operational data}
+        - {ScopeName: write, ScopeDescription: Submit tenant-scoped operational changes}
+  ArquiFusionHostedDomain:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: {Ref: DomainPrefix}
+      UserPoolId: {Ref: ArquiFusionUserPool}
+  ArquiFusionWebClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: ArquiFusionApiScopes
+    Properties:
+      ClientName: arquifusion-web
+      UserPoolId: {Ref: ArquiFusionUserPool}
+      GenerateSecret: false
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows: [code]
+      AllowedOAuthScopes: [openid, email, profile, arquifusion/read, arquifusion/write]
+      SupportedIdentityProviders: [COGNITO]
+      CallbackURLs: [{Ref: CallbackUrl}]
+      LogoutURLs: [{Ref: LogoutUrl}]
+      ExplicitAuthFlows: [ALLOW_USER_SRP_AUTH, ALLOW_REFRESH_TOKEN_AUTH]
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+Outputs:
+  UserPoolId: {Value: {Ref: ArquiFusionUserPool}}
+  WebClientId: {Value: {Ref: ArquiFusionWebClient}}
+  IssuerUrl:
+    Value: {Fn::Sub: 'https://cognito-idp.${AWS::Region}.amazonaws.com/${ArquiFusionUserPool}'}
+  HostedUiUrl:
+    Value: {Fn::Sub: 'https://${ArquiFusionHostedDomain}.auth.${AWS::Region}.amazoncognito.com'}

@@ -17,6 +17,7 @@ export interface AgentDescriptor {
 }
 
 export interface AgentEvent {
+  tenantId: string;
   eventId: string;
   eventType: string;
   schemaVersion: "1.0";
@@ -29,6 +30,7 @@ export interface AgentEvent {
 }
 
 export interface TaskRecord {
+  tenantId: string;
   taskId: string;
   executionId: string;
   correlationId: string;
@@ -47,10 +49,14 @@ export interface TaskRecord {
 
 export interface TaskStore {
   create(task: TaskRecord, event: AgentEvent): Promise<{ task: TaskRecord; created: boolean }>;
-  get(taskId: string): Promise<TaskRecord | undefined>;
-  list(): Promise<TaskRecord[]>;
-  events(taskId?: string): Promise<AgentEvent[]>;
+  get(tenantId: string, taskId: string): Promise<TaskRecord | undefined>;
+  list(tenantId: string): Promise<TaskRecord[]>;
+  events(tenantId: string, taskId?: string): Promise<AgentEvent[]>;
   update(task: TaskRecord, event: AgentEvent): Promise<void>;
+}
+
+export interface TaskDispatcher {
+  dispatch(input: { tenantId: string; taskId: string }): Promise<void>;
 }
 
 export class PermanentTaskError extends Error {
