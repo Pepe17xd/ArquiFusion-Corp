@@ -60,6 +60,8 @@ Al enviar una tarea, el Supervisor valida `fleet.recommendations`, crea task/exe
 
 Step Functions Standard ofrece semántica de ejecución de workflow, pero no hace transaccionales efectos laterales de Lambda. El proveedor actual es una lectura/recomendación determinista; efectos futuros deben ser idempotentes. Un error de red ambiguo en `StartExecution` todavía puede dejar una ejecución iniciada cuyo acuse no llegó; la API informa fallo de dispatch, así que el operador debe inspeccionar task y ejecución antes de volver a solicitarla. La simulación local no reproduce el historial, concurrencia, retries, límites ni redrive de AWS.
 
+`DynamoTaskStore.update` comprueba que el registro exista, pero no usa un número de versión ni una condición de transición sobre el estado anterior. Una invocación duplicada/concurrente del worker podría volver a ejecutar el proveedor y añadir eventos repetidos o sobrescribir el estado más reciente. Hoy el proveedor solo lee datos y calcula recomendaciones, por lo que no repite efectos operativos. Antes de añadir acciones con efectos, debe agregarse control optimista de versión/claim condicional de tarea y una prueba de concurrencia contra el adaptador correspondiente.
+
 ## Observabilidad
 
 La API emite JSON con request ID, correlation ID, operación, tenant autorizado, status, duración y tipo de error. Nunca registra JWT ni cuerpos de importación. En local cada solicitud recibe UUID nuevo; el correlation ID entrante solo se acepta con caracteres limitados. Hay logs de seguridad separados para rechazos 401/403. Eventos de negocio se persisten como eventos de tarea; no existe una auditoría general de cambios ni exportación/retención de logs cloud declarada.
