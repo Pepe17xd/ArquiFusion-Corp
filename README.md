@@ -130,7 +130,7 @@ sequenceDiagram
 
     Admin->>API: Solicita explicación de anomalía (opcional)
     API->>IA: Envía evidencia al proveedor configurado
-    IA-->>API: Explicación; si falla, se conserva el análisis determinista
+    IA-->>API: Explicación, o análisis determinista si el proveedor falla
     API-->>Web: Resultado asociado a evidencia disponible
 
     Admin->>API: Solicita optimización de asignación
@@ -180,6 +180,42 @@ AURA es la capa de coordinación determinista para convertir un incidente elegib
 - **IA:** un proveedor generativo configurado puede explicar recomendaciones usando evidencia. La asignación y las acciones críticas siguen el flujo determinista y requieren la aprobación prevista; Gemini no ejecuta automáticamente una reparación.
 
 Consulta [AURA-ARCHITECTURE.md](cloud/aws/AURA-ARCHITECTURE.md) y [AURA-IMPLEMENTATION.md](cloud/aws/AURA-IMPLEMENTATION.md) para estados, tablas, contratos y consideraciones operativas.
+
+## Ecosistema de agentes inteligentes — AURA
+
+AURA busca apoyar la supervisión y coordinación de operaciones industriales, relacionando información de maquinaria, mantenimiento, incidentes, inventario y personal técnico. En la interfaz aparecen seis especialidades con el estado **Planificado**. Son una arquitectura objetivo representada en el frontend; el repositorio no contiene seis agentes autónomos independientes ejecutándose.
+
+### Capacidades y estado comprobable
+
+| Agente | Problema que busca resolver | Información de entrada | Responsabilidad | Resultado esperado | Estado real en el repositorio |
+|---|---|---|---|---|---|
+| Coordinador | Reunir señales de las especialidades y facilitar la coordinación de recomendaciones y decisiones operativas. | Resultados de flota, incidentes, mantenimiento, inventario y asignaciones disponibles. | Relacionar los resultados, señalar dependencias y preparar una propuesta común para revisión. | Una síntesis contextual y una secuencia de acciones propuestas para revisión. | **Planificado.** La tarjeta del frontend está marcada así; no existe un agente coordinador autónomo implementado. |
+| Mantenimiento predictivo | Detectar señales de desgaste o posibles fallas antes de una parada inesperada. | Telemetría disponible, historial de mantenimiento y reglas operativas. | Evaluar tendencias con datos suficientes y señalar cuándo conviene inspeccionar, sin inventar predicciones. | Una señal para priorizar una inspección, con evidencia y límites explícitos. | **Planificado como agente predictivo.** Operations implementa reglas de anomalía, pero eso no constituye un modelo predictivo ni una predicción estadística. |
+| Operaciones de flota | Identificar equipos cuyo estado, actividad o disponibilidad requiere atención. | Máquinas, estados, métricas e información de flota recibida. | Revisar estados y reglas disponibles; asociar observaciones al equipo correspondiente. | Recomendaciones de operación asociadas a una máquina y evidencia disponible. | **Parcialmente implementado.** Existe una evaluación determinista de flota y el flujo Supervisor de recomendaciones/tareas. La tarjeta especializada sigue planificada; el proveedor Gemini requiere configuración y no sustituye las reglas. |
+| Inteligencia de inventario | Relacionar repuestos, existencias, ubicaciones, reservas y alertas con necesidades de trabajo. | Catálogo, saldos, movimientos, mínimos y órdenes de mantenimiento. | Comprobar disponibilidad y alertar sobre faltantes antes o durante una orden. | Información de disponibilidad y posibles necesidades de reposición o reserva. | **Parcialmente implementado.** El backend AURA contiene operaciones de inventario y reservas; el agente especializado está planificado y el stack AURA requiere despliegue/configuración. |
+| Asignación de técnicos | Ayudar a seleccionar una persona elegible según especialidad, habilidades, disponibilidad y carga. | Requisitos de la orden/incidente, perfiles, turnos, disponibilidad y capacidad; ubicación solo con coordenadas válidas. | Filtrar candidatos no elegibles y calcular una asignación de costo global explicable. | Una propuesta determinista de asignación explicable para aprobación. | **Parcialmente implementado.** El backend incluye elegibilidad y optimización húngara, pero no un agente autónomo; la asignación requiere la aprobación humana prevista y el stack AURA no se considera desplegado por este repositorio. |
+| Inteligencia de incidentes | Analizar sucesos registrados y facilitar la identificación de acciones correctivas. | Incidente, anomalía, telemetría/evidencia asociada y actividad previa disponible. | Relacionar evidencia y estado con una acción correctiva que debe revisar un usuario autorizado. | Contexto de atención o propuesta para crear/actualizar una orden correctiva. | **Parcialmente implementado.** Operations implementa reglas, persistencia de incidentes y órdenes; la especialidad agente de incidentes mostrada en frontend sigue planificada. |
+
+### Implementado, parcial y dependiente de configuración
+
+- **Implementado en código:** el frontend ejecuta la evaluación actual de flota mediante el flujo Supervisor; las reglas deterministas de Operations pueden evaluar lecturas y registrar anomalías/incidentes según configuración; AURA contiene lógica de asignación, inventario y coordinación en stacks separados.
+- **Parcial:** las funciones de Operations/AURA están en el repositorio, pero requieren que sus stacks y recursos compartidos se desplieguen y configuren. Los perfiles y tarjetas de seis especialidades no significan que haya seis procesos de agente ejecutándose.
+- **Planificado:** los roles predictivo, coordinador, inventario e incidentes como agentes especializados, y la operación multiagente autónoma reflejada en la interfaz.
+- **Integración externa:** Gemini está detrás de proveedores de servidor configurables. Se necesitan URL, credenciales protegidas y un servicio disponible. El navegador no invoca Gemini directamente. La respuesta generativa puede fallar o no estar configurada; las reglas deterministas no dependen de ella.
+- **Aprobación:** una recomendación no ejecuta por sí sola una reparación, una asignación o un cambio crítico. Las aprobaciones y transiciones quedan a cargo de los actores autorizados según el flujo y contrato desplegados.
+
+### Ejemplo de flujo: temperatura elevada
+
+1. **Lectura recibida — integración o carga:** una fuente envía telemetría de temperatura para una máquina mediante el contrato de Operations.
+2. **Detección — automática, si la regla está configurada:** las reglas deterministas evalúan la lectura; no se infiere una falla si los datos o umbrales necesarios faltan.
+3. **Incidente — automático bajo una regla aplicable o manual por un administrador:** se conserva la evidencia disponible y se registra el evento correspondiente.
+4. **Análisis — solicitado por una persona o proceso autorizado:** Gemini puede elaborar una explicación si el proveedor externo está configurado; ante su ausencia o fallo permanece disponible el resultado determinista que corresponda.
+5. **Propuesta de mantenimiento — según regla o acción administrativa:** Operations puede generar una orden al confirmar una anomalía según sus reglas. También existe creación manual de una orden desde el incidente, aunque no haya análisis Gemini.
+6. **Asignación — cálculo determinista, aprobación humana:** AURA calcula candidatos elegibles; un administrador revisa y confirma la asignación.
+7. **Repuestos — acción autorizada:** el inventario permite consultar saldos y operar reservas/movimientos mediante controles de persistencia. La reserva no debe darse por realizada solo porque exista una recomendación.
+8. **Ejecución y cierre — técnico y revisión administrativa:** el técnico registra las acciones permitidas y completa el trabajo; la aprobación/cierre se registra por el actor autorizado y queda en el historial.
+
+Este recorrido describe capacidades del código y contratos. No afirma que el circuito completo esté activo en AWS: Operations y AURA necesitan despliegue y validación del entorno antes de una demostración conectada.
 
 ## Tecnologías
 

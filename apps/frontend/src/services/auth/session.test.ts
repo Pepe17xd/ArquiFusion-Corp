@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import { strict as assert } from "node:assert";
 import { createSessionClient, type SessionRuntime } from "./session-core.ts";
+import { isPublicRoute, shouldRedirectRestoredRoute } from "./routes.ts";
 
 const origin = "http://localhost:5173";
 const domain = "https://identity.example.test";
@@ -141,8 +142,9 @@ test("logout revokes the refresh token, clears local state, and ends the Cognito
   assert.equal(logoutUrl.origin, domain);
   assert.equal(logoutUrl.pathname, "/logout");
   assert.equal(logoutUrl.searchParams.get("client_id"), clientId);
-  assert.equal(logoutUrl.searchParams.get("logout_uri"), origin);
+  assert.equal(logoutUrl.searchParams.get("logout_uri"), `${origin}/`);
   assert.deepEqual([...logoutUrl.searchParams.keys()].sort(), ["client_id", "logout_uri"]);
+  assert.equal(runtime.location.replaced, true);
   assert.equal(new URLSearchParams(revokeBody).get("token"), "value");
   assert.equal(new URLSearchParams(revokeBody).get("client_id"), clientId);
   assert.equal(storage.getItem("arquifusion.access-token"), null);
@@ -156,7 +158,17 @@ test("logout clears local state and redirects even when token revocation fails",
   const runtime = runtimeFor(storage, async () => { throw new Error("network failure"); });
   await createSessionClient(runtime).signOut();
   assert.equal(new URL(runtime.location.href).pathname, "/logout");
+  assert.equal(runtime.location.replaced, true);
   for (const key of ["arquifusion.access-token", "arquifusion.refresh-token", "arquifusion.tenant-id", "arquifusion.oauth-state", "arquifusion.pkce-verifier"]) assert.equal(storage.getItem(key), null);
+});
+
+test("logout sends a restored protected route to the public landing page without a session", () => {
+  assert.equal(isPublicRoute("/"), true);
+  assert.equal(isPublicRoute("/app"), false);
+  assert.equal(shouldRedirectRestoredRoute(true, false, "/app"), true);
+  assert.equal(shouldRedirectRestoredRoute(false, false, "/app"), false);
+  assert.equal(shouldRedirectRestoredRoute(true, true, "/app"), false);
+  assert.equal(shouldRedirectRestoredRoute(true, false, "/"), false);
 });
 
 function runtimeFor(storage: MemoryStorage, fetcher: typeof fetch = async () => Response.json({})) {
@@ -164,7 +176,9 @@ function runtimeFor(storage: MemoryStorage, fetcher: typeof fetch = async () => 
     origin,
     href: origin + "/",
     get pathname() { return new URL(this.href).pathname; },
+    replaced: false,
     assign(url: string | URL) { this.href = String(url); },
+    replace(url: string | URL) { this.href = String(url); this.replaced = true; },
   };
   const history = { replaceState: (_state: unknown, _title: string, url?: string | URL | null) => { location.href = new URL(String(url ?? "/"), origin).toString(); } };
   return { mode: "cognito", clientId, domain, redirectUri, storage, location, history, crypto: globalThis.crypto, fetcher } as SessionRuntime & { location: typeof location };

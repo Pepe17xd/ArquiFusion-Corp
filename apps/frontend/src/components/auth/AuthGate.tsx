@@ -3,6 +3,7 @@ import type { FormEvent, ReactNode } from "react";
 import { apiSession } from "../../services/api/client";
 import { authMode, beginLogin, clearTenant, completeLoginCallback, hasSession, selectTenant, selectedTenantId, signOut, type TenantChoice } from "../../services/auth/session";
 import { toUserMessage } from "../../services/api/user-message";
+import { shouldRedirectRestoredRoute } from "../../services/auth/routes";
 
 export function AuthGate({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(authMode === "local");
@@ -46,6 +47,19 @@ export function AuthGate({ children }: { children: ReactNode }) {
     const expired = () => { setAuthenticated(false); setTenantId(undefined); setTenants([]); };
     window.addEventListener("arquifusion:session-expired", expired);
     return () => window.removeEventListener("arquifusion:session-expired", expired);
+  }, []);
+  useEffect(() => {
+    const restore = (event: PageTransitionEvent) => {
+      if (authMode !== "cognito") return;
+      const signedIn = hasSession();
+      if (shouldRedirectRestoredRoute(event.persisted, signedIn, window.location.pathname)) {
+        clearTenant();
+        setAuthenticated(false); setTenantId(undefined); setTenants([]);
+        window.location.replace("/");
+      } else if (signedIn) setAuthenticated(true);
+    };
+    window.addEventListener("pageshow", restore);
+    return () => window.removeEventListener("pageshow", restore);
   }, []);
 
   async function createTenant(event: FormEvent) {

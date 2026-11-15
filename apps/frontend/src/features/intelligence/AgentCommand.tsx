@@ -25,13 +25,13 @@ export function AgentCommand({ result, loading, onRun, onOpenMachine, machines, 
   return <div className="agent-command-page">
     <div className="agent-layout">
       <section className="panel agent-list-panel">
-        <div className="section-heading"><div><div className="eyebrow">ROLES DEL ECOSISTEMA</div><h2>Especialidades planificadas</h2></div><span className="roster-count">6 ROLES Â· PLANIFICADOS</span></div>
+        <div className="section-heading"><div><div className="eyebrow">ROLES DEL ECOSISTEMA</div><h2>Especialidades planificadas</h2></div><span className="roster-count">6 ROLES · PLANIFICADOS</span></div>
         <div className="agent-roster">{agents.map((item) => <button className={`agent-row${selected === item.id ? " active" : ""}`} key={item.id} onClick={() => setSelected(item.id)} aria-pressed={selected === item.id}>
           <span className="agent-avatar"><MascotMark role={item.id}/></span><span className="agent-identity"><b>{item.name}</b><small>{item.role}</small></span><AgentStatusBadge planned/>
         </button>)}</div>
       </section>
       <section className="panel agent-detail">
-        <div className="eyebrow">PERFIL DE ESPECIALIDAD Â· {agent.specialty.toUpperCase()}</div>
+        <div className="eyebrow">PERFIL DE ESPECIALIDAD · {agent.specialty.toUpperCase()}</div>
         <div className="agent-profile-heading"><span className="agent-avatar large"><MascotMark role={agent.id}/></span><div><h2>{agent.name}</h2><p>{agent.role}</p></div><AgentStatusBadge planned/></div>
         <p className="agent-description">{agent.desc}</p>
         <div className="planned-detail"><Clock3 size={20}/><b>Capacidad planificada</b><span>Esta capacidad está en preparación. Aquí aparecerán sus resultados cuando esté disponible.</span></div>

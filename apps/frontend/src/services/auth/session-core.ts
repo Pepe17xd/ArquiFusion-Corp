@@ -4,7 +4,7 @@ export interface SessionRuntime {
   domain: string;
   redirectUri: string;
   storage: Pick<Storage, "getItem" | "setItem" | "removeItem">;
-  location: Pick<Location, "origin" | "href" | "pathname" | "assign">;
+  location: Pick<Location, "origin" | "href" | "pathname" | "assign" | "replace">;
   history: Pick<History, "replaceState">;
   crypto: Pick<Crypto, "getRandomValues" | "subtle">;
   fetcher: typeof fetch;
@@ -105,18 +105,18 @@ export function createSessionClient(runtime: SessionRuntime) {
   async function signOut() {
     const refresh = runtime.storage.getItem(REFRESH_KEY);
     clearSession(); runtime.storage.removeItem(STATE_KEY); runtime.storage.removeItem(VERIFIER_KEY);
-    if (runtime.mode !== "cognito" || !runtime.clientId || !runtime.domain) { runtime.location.assign("/"); return; }
-    const logout = new URL(`${runtime.domain}/logout`);
-    logout.search = new URLSearchParams({ client_id: runtime.clientId, logout_uri: runtime.location.origin }).toString();
+    const publicHome = new URL("/", runtime.location.origin).toString();
+    if (runtime.mode !== "cognito" || !runtime.clientId || !runtime.domain) { runtime.location.replace(publicHome); return; }
+    const logout = new URL("/logout", runtime.domain);
+    logout.search = new URLSearchParams({ client_id: runtime.clientId, logout_uri: publicHome }).toString();
     if (refresh) {
-      try {
-        await runtime.fetcher(`${runtime.domain}/oauth2/revoke`, {
+      void runtime.fetcher(`${runtime.domain}/oauth2/revoke`, {
           method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ token: refresh, client_id: runtime.clientId }), signal: AbortSignal.timeout(5000),
-        });
-      } catch { /* Local credentials are already cleared; still end the Hosted UI session. */ }
+          body: new URLSearchParams({ token: refresh, client_id: runtime.clientId }),
+          signal: AbortSignal.timeout(5000), keepalive: true,
+        }).catch(() => undefined);
     }
-    runtime.location.assign(logout.toString());
+    runtime.location.replace(logout.toString());
   }
 
   return {

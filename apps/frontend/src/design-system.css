@@ -236,7 +236,7 @@ input[type="checkbox"], input[type="radio"] { accent-color: var(--color-primary)
 .landing-section { border-color: var(--color-border-soft); }
 .capability-grid, .flow { gap: 1px; background: var(--color-border-soft); }
 .capability-grid article, .flow div, .team-grid article { background: #151517; }
-.capability-grid svg, .capability-grid span, .capability-card a, .capability-visual, .capability-visual i, .flow svg, .product-brain svg, .product-brain span, .product-brain small, .product-links path { color: #e0b9bb; stroke: #e0b9bb; }
+.capability-grid svg, .capability-grid span, .capability-card a, .capability-visual, .capability-visual i, .flow svg, .product-brain svg, .product-brain span, .product-brain small { color: #e0b9bb; stroke: #e0b9bb; }
 .capability-visual i { background: var(--color-primary); box-shadow: 0 0 8px rgb(229 36 45 / 28%); }
 .landing .hero-logo-fragments img { filter: grayscale(1) brightness(1.25); }
 .preview-section, .preview-panel, .product-brain, .product-side > div, .product-metrics div, .product-side div { border-color: var(--color-border); background-color: #151517; }

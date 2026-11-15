@@ -9,6 +9,13 @@ const eventWords: Array<[RegExp, string]> = [
 
 /** Turns event codes into readable labels without exposing internal naming conventions. */
 export function toEventLabel(value: string): string {
+  const knownLabels: Record<string, string> = {
+    AgentTaskRequested: "Análisis solicitado",
+    AgentTaskStarted: "Análisis iniciado",
+    AgentTaskCompleted: "Análisis completado",
+    MaintenanceWorkCompleted: "Mantenimiento completado",
+  };
+  if (knownLabels[value]) return knownLabels[value];
   return eventWords.reduce((label, [pattern, replacement]) => label.replace(pattern, replacement), value.replace(/([a-záéíóúñ])([A-Z])/g, "$1 $2"))
     .replace(/[_-]+/g, " ")
     .replace(/\s+/g, " ")
