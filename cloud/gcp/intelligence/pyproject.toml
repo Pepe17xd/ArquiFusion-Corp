@@ -3,7 +3,7 @@ name = "arquifusion-intelligence-service"
 version = "0.1.0"
 description = "Python contract boundary for the optional ArquiFusion Cloud Run intelligence service"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = ["google-genai>=1.0"]
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
