@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { fleetApi, apiSession, type AgentTask, type FleetMetrics, type Machine, type OperationsOverview, type RecommendationResult } from "./services/api/client";
-import { NavigationRail, type AppView } from "./components/navigation/NavigationRail";
+import { type AppView } from "./components/navigation/NavigationRail";
 import { TopBar } from "./components/layout/TopBar";
 import { FeedbackBanner } from "./components/feedback/FeedbackBanner";
 import { CommandCenter } from "./features/dashboard/CommandCenter";
@@ -13,6 +13,7 @@ import { PlannedView } from "./features/planned/PlannedView";
 import { authMode, selectedTenantId, signOut } from "./services/auth/session";
 import "./style.css";
 import "./supervisor.css";
+import "./dashboard-redesign.css";
 
 const headings: Record<AppView, [string, string]> = {
   command: ["Centro de mando", "Estado de la flota, señales actuales e inteligencia operacional en una sola vista."],
@@ -31,8 +32,8 @@ export default function App() {
   const [metrics, setMetrics] = useState<FleetMetrics | null>(null);
   const [overview, setOverview] = useState<OperationsOverview | null>(null);
   const [machines, setMachines] = useState<Machine[]>([]);
-  const [nextCursor, setNextCursor] = useState<string>();
-  const [cursorStack, setCursorStack] = useState<string[]>([]);
+  const [pageNumber, setPageNumber] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [searchInput, setSearchInput] = useState("");
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
@@ -41,6 +42,8 @@ export default function App() {
   const [checking, setChecking] = useState(true);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [fleetError, setFleetError] = useState(false);
+  const loadVersion = useRef(0);
   const [notice, setNotice] = useState("");
   const [recommendationResult, setRecommendationResult] = useState<RecommendationResult | null>(null);
   const [intelligenceError, setIntelligenceError] = useState("");
@@ -53,23 +56,35 @@ export default function App() {
   const [now, setNow] = useState(new Date());
   const [mobileMenu, setMobileMenu] = useState(false);
 
-  const cursor = cursorStack.at(-1);
-  const load = useCallback(async (reset = false) => {
+  const load = useCallback(async () => {
+    const version = ++loadVersion.current;
     setLoading(true);
     setChecking(true);
     setError("");
-    const params = new URLSearchParams({ limit: "20" });
-    if (!reset && cursor) params.set("cursor", cursor);
-    if (status) params.set("status", status);
-    if (category) params.set("category", category);
-    if (search) params.set("search", search);
-    const [health, page, totals, operations] = await Promise.allSettled([fleetApi.health(), fleetApi.machines(params), fleetApi.metrics(), fleetApi.overview()]);
+    const allMachines = async () => {
+      const items: Machine[] = [];
+      const seen = new Set<string>();
+      let cursor: string | undefined;
+      do {
+        const params = new URLSearchParams({ limit: "100" });
+        if (cursor) params.set("cursor", cursor);
+        const page = await fleetApi.machines(params);
+        items.push(...page.items);
+        cursor = page.nextCursor;
+        if (cursor && seen.has(cursor)) throw new Error("La API devolvió un cursor repetido; no se pudo completar la carga de flota.");
+        if (cursor) seen.add(cursor);
+      } while (cursor);
+      return items;
+    };
+    const [health, page, totals, operations] = await Promise.allSettled([fleetApi.health(), allMachines(), fleetApi.metrics(), fleetApi.overview()]);
 
+    if (version !== loadVersion.current) return;
     if (health.status === "fulfilled") setConnected(health.value.status === "ok");
     else setConnected(false);
     setChecking(false);
-    if (page.status === "fulfilled") { setMachines(page.value.items); setNextCursor(page.value.nextCursor); }
-    else { setMachines([]); setNextCursor(undefined); }
+    setFleetError(page.status === "rejected");
+    if (page.status === "fulfilled") setMachines(page.value);
+    else setMachines([]);
     if (totals.status === "fulfilled") setMetrics(totals.value);
     else setMetrics(null);
     if (operations.status === "fulfilled") setOverview(operations.value);
@@ -79,7 +94,7 @@ export default function App() {
     const failure = page.status === "rejected" ? page.reason : totals.status === "rejected" ? totals.reason : health.status === "rejected" ? health.reason : undefined;
     if (failure) setError(failure instanceof Error ? failure.message : "No se pudieron cargar los datos de la API.");
     setLoading(false);
-  }, [cursor, status, category, search]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => { if (authMode === "cognito") void apiSession.tenants().then(items => { const found = items.find(item => item.tenant.tenantId === selectedTenantId()); if (found) setOrganization(found.tenant.name); }).catch(() => undefined); }, []);
@@ -111,7 +126,7 @@ export default function App() {
   }
 
   function submitSearch(event: FormEvent) {
-    event.preventDefault(); setCursorStack([]); setSearch(searchInput.trim());
+    event.preventDefault(); setPageNumber(1); setSearch(searchInput.trim());
   }
 
   async function ingest(file?: File) {
@@ -121,31 +136,29 @@ export default function App() {
     try {
       const result = await fleetApi.ingest(file);
       setNotice(`${result.processed} registros procesados: ${result.accepted.length} aceptados y ${result.rejected.length} rechazados. Original: ${result.originalFileUri}`);
-      setCursorStack([]); await load(true);
+      setPageNumber(1); await load();
     } catch (reason) { setError(reason instanceof Error ? reason.message : "Falló la importación."); }
     finally { setImporting(false); }
   }
 
   function navigate(target: AppView) {
-    if (target === "command") { setCursorStack([]); setSearch(""); setSearchInput(""); setStatus(""); setCategory(""); }
+    if (target === "command") { setPageNumber(1); setSearch(""); setSearchInput(""); setStatus(""); setCategory(""); }
     setView(target); setMobileMenu(false);
   }
 
   return <div className="app-frame">
-    {mobileMenu && <button className="rail-scrim" aria-label="Cerrar navegación" onClick={() => setMobileMenu(false)}/>}
-    <div className={`rail-wrap${mobileMenu ? " mobile-open" : ""}`}><NavigationRail view={view} onNavigate={navigate} connected={connected} checking={checking} fleetCount={metrics?.total ?? 0}/></div>
     <div className="main-column">
-      <TopBar view={view} connected={connected} checking={checking} dateTime={now} onRefresh={() => void load()} refreshing={loading} onMenu={() => setMobileMenu((open) => !open)}/>
+      <TopBar view={view} onNavigate={navigate} connected={connected} checking={checking} dateTime={now} onRefresh={() => void load()} refreshing={loading} mobileMenu={mobileMenu} onMenu={() => setMobileMenu((open) => !open)} organization={organization} onSignOut={authMode === "cognito" ? signOut : undefined}/>
       <main className="content-area">
         {(error || notice) && <FeedbackBanner kind={error ? "error" : "success"} onDismiss={() => { setError(""); setNotice(""); }}>{error || notice}</FeedbackBanner>}
         <div className="page-intro"><div><div className="eyebrow">ARQUIFUSION / OPERACIONES</div><h1>{headings[view][0]}</h1><p>{headings[view][1]}</p></div>{view !== "ingestion" && <span className="data-origin"><span className={`origin-led ${connected ? "online" : checking ? "checking" : "offline"}`}/>{connected ? "DATOS DE API" : checking ? "REVISANDO API" : "API SIN CONEXIÓN"}</span>}</div>
         {view === "command" && <CommandCenter metrics={metrics} machines={machines} total={metrics?.total ?? 0} loading={loading} result={recommendationResult} intelligenceLoading={intelligenceLoading} intelligenceError={intelligenceError} overview={overview} task={task} connected={connected} checking={checking} lastUpdated={lastUpdated} organization={organization} onRun={runIntelligence} onNavigate={navigate} onOpenMachine={openMachine}/>}
-        {view === "fleet" && <FleetView machines={machines} metrics={metrics} loading={loading} search={searchInput} setSearch={setSearchInput} onSearch={submitSearch} status={status} setStatus={(value) => { setCursorStack([]); setStatus(value); }} category={category} setCategory={(value) => { setCursorStack([]); setCategory(value); }} cursorStack={cursorStack} nextCursor={nextCursor} setCursorStack={setCursorStack} onOpenMachine={openMachine}/>} 
+        {view === "fleet" && <FleetView machines={machines} metrics={metrics} loading={loading} fleetError={fleetError} search={searchInput} setSearch={setSearchInput} onSearch={submitSearch} status={status} setStatus={(value) => { setPageNumber(1); setStatus(value); }} category={category} setCategory={(value) => { setPageNumber(1); setCategory(value); }} appliedSearch={search} pageNumber={pageNumber} pageSize={pageSize} setPageNumber={setPageNumber} setPageSize={(value) => { setPageNumber(1); setPageSize(value); }} onOpenMachine={openMachine}/>} 
         {view === "agents" && <AgentCommand result={recommendationResult} loading={intelligenceLoading} onRun={runIntelligence} onOpenMachine={openMachine}/>} 
         {view === "activity" && <ActivityView overview={overview}/>}
         {view === "ingestion" && <IngestionView importing={importing} onFile={ingest}/>}
         {["maintenance", "inventory", "technicians", "incidents"].includes(view) && <PlannedView view={view} description={headings[view][1]}/>}
-        <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>{authMode === "local" ? "ENTORNO LOCAL SIMULADO" : <button className="auth-link" onClick={signOut}>Cerrar sesión</button>} · <b>{connected ? "API CONECTADA" : checking ? "CONECTANDO" : "API SIN CONEXIÓN"}</b></span></footer>
+        <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>PLATAFORMA DE OPERACIONES</span></footer>
       </main>
     </div>
     {selectedMachine && <MachineDialog machine={selectedMachine} onClose={() => setSelectedMachine(null)}/>}
