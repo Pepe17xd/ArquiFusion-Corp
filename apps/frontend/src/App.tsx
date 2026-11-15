@@ -71,7 +71,7 @@ export default function App() {
         const page = await fleetApi.machines(params);
         items.push(...page.items);
         cursor = page.nextCursor;
-        if (cursor && seen.has(cursor)) throw new Error("La API devolvi? un cursor repetido; no se pudo completar la carga de flota.");
+        if (cursor && seen.has(cursor)) throw new Error("La API devolvió un cursor repetido; no se pudo completar la carga de flota.");
         if (cursor) seen.add(cursor);
       } while (cursor);
       return items;

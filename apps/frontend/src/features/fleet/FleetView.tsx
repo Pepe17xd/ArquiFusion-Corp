@@ -21,7 +21,7 @@ export function FleetView({ machines, metrics, loading, fleetError, search, setS
       <div className="fleet-toolbar">
         <form className="search-form" onSubmit={onSearch}>
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-          <input aria-label="Buscar por ID, modelo o ubicaci?n" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar ID, modelo o ubicación"/>
+          <input aria-label="Buscar por ID, modelo o ubicación" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar ID, modelo o ubicación"/>
           <button type="submit">Buscar</button>
         </form>
         <div className="filters">
@@ -30,7 +30,7 @@ export function FleetView({ machines, metrics, loading, fleetError, search, setS
         </div>
       </div>
       {fleetError && !loading ? <div className="table-message" role="alert">No se pudieron cargar los registros de flota. Actualiza para reintentar.</div> : <MachineTable machines={page.items} loading={loading} onOpen={onOpenMachine}/>}
-      <div className="pagination"><div><span>Paginaci?n del cliente ? {fleetError ? "Total no disponible" : `${page.total} registros coincidentes`} ? p?gina {page.page} de {page.pages} ? {page.items.length} visibles</span><label>Registros por p?gina <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[5, 10, 20].map(size => <option key={size} value={size}>{size}</option>)}</select></label></div><div>
+      <div className="pagination"><div><span>Paginación del cliente · {fleetError ? "Total no disponible" : `${page.total} registros coincidentes`} · página {page.page} de {page.pages} · {page.items.length} visibles</span><label>Registros por página <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[5, 10, 20].map(size => <option key={size} value={size}>{size}</option>)}</select></label></div><div>
         <button className="button button-secondary" disabled={page.page <= 1 || loading} onClick={() => setPageNumber(page.page - 1)}><ArrowLeft size={14}/> Anterior</button>
         <button className="button button-secondary" disabled={page.page >= page.pages || loading} onClick={() => setPageNumber(page.page + 1)}>Siguiente <ArrowRight size={14}/></button>
       </div></div>

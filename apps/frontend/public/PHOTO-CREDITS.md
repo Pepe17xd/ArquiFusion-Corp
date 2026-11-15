@@ -1,4 +1,4 @@
-﻿# Fotografía
+# Fotografía
 
 Las siguientes fotografías se distribuyen bajo la [licencia de Unsplash](https://unsplash.com/license):
 
