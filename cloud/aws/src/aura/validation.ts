@@ -82,7 +82,8 @@ export function validateReservation(value: unknown) {
 
 export function validateOptimization(value: unknown) {
   const row = object(value, "body");
-  allowed(row, ["incidentIds", "requirements"], "body");
+  allowed(row, ["incidentIds", "requirements", "dispatch"], "body");
+  if (row.dispatch !== undefined && typeof row.dispatch !== "boolean") throw new ValidationError(["dispatch must be a boolean"]);
   if (!Array.isArray(row.incidentIds) || row.incidentIds.length < 1 || row.incidentIds.length > 25) throw new ValidationError(["incidentIds must contain 1 to 25 incident identifiers"]);
   const incidentIds = row.incidentIds.map((id, index) => safeId(id, `incidentIds[${index}]`));
   if (new Set(incidentIds).size !== incidentIds.length) throw new ValidationError(["incidentIds must be unique"]);
@@ -102,7 +103,7 @@ export function validateOptimization(value: unknown) {
       if (new Set(requirements[incidentId].map((skill) => skill.code)).size !== requirements[incidentId].length) throw new ValidationError([`requirements.${incidentId} has duplicate skill codes`]);
     }
   }
-  return { incidentIds, requirements };
+  return { incidentIds, requirements, dispatch: row.dispatch as boolean | undefined };
 }
 
 export function validatePolicy(value: unknown) {

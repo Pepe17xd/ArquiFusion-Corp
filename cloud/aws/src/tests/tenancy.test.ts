@@ -49,6 +49,33 @@ test("local identity is fixed, tenant selection requires membership, and tenant 
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
+test("tenant owner can idempotently attach an existing Cognito subject as technician", async () => {
+  const dir = await mkdtemp(join(dataRoot, ".test-technician-membership-"));
+  try {
+    const directory = new LocalTenantDirectory(join(dir, "tenants.json"));
+    const tenant = await directory.createTenant("owner-sub", "Tenant A", "tenant-create");
+    const first = await directory.addTechnicianMember(tenant.tenant.tenantId, "existing-cognito-sub");
+    const replay = await directory.addTechnicianMember(tenant.tenant.tenantId, "existing-cognito-sub");
+    assert.equal(first.role, "technician");
+    assert.equal(replay.createdAt, first.createdAt);
+    assert.equal((await directory.resolve("existing-cognito-sub", tenant.tenant.tenantId)).role, "technician");
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("technician membership cannot be reassigned into another tenant and deactivated subjects stay blocked", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "tenant-technician-disable-"));
+  try {
+    const tenants = new LocalTenantDirectory(join(dir, "tenants.json"));
+    const first = await tenants.createTenant("owner-first", "First", "owner-first-key");
+    const second = await tenants.createTenant("owner-second", "Second", "owner-second-key");
+    await tenants.addTechnicianMember(first.tenant.tenantId, "tech-shared");
+    await assert.rejects(tenants.addTechnicianMember(second.tenant.tenantId, "tech-shared"), /already belongs to another organization/);
+    await tenants.disableUser("tech-shared");
+    await assert.rejects(tenants.assertUserActive("tech-shared"), /disabled/);
+    await assert.rejects(tenants.resolve("tech-shared", first.tenant.tenantId), /not a member/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
 test("local API ignores tenant IDs in imported records and refuses unverified Cognito identity", async () => {
   const dir = await mkdtemp(join(dataRoot, ".test-tenant-api-"));
   const services = {

@@ -11,6 +11,104 @@ servers:
     variables: {apiId: {default: api-id}, region: {default: us-east-1}}
 security: [{cognitoAccessToken: []}]
 paths:
+  /tenants/{tenantId}/members:
+    post:
+      operationId: addTechnicianTenantMember
+      deprecated: true
+      description: Legacy direct subject linking is disabled because a caller-supplied sub does not prove account consent. Use the Cognito email invitation endpoint instead.
+      parameters:
+        - {name: tenantId, in: path, required: true, schema: {type: string}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [userSub], properties: {userSub: {type: string, minLength: 1, maxLength: 128}}}
+      responses: {'403': {description: Tenant administrator required}, '409': {description: Direct subject linking is disabled; use email invitation}}
+  /tenants/{tenantId}/technicians/invitations:
+    post:
+      operationId: inviteTechnician
+      description: AdminCreateUser sends the Cognito invitation. The backend links Cognito's returned sub; caller cannot supply sub, tenantId or credentials.
+      parameters:
+        - {name: tenantId, in: path, required: true, schema: {type: string}}
+        - {$ref: '#/components/parameters/IdempotencyKey'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [email, technicianId, displayName, specialties, skills, availability, maxConcurrentAssignments, shifts]
+              properties:
+                email: {type: string, format: email, maxLength: 254}
+                technicianId: {type: string, minLength: 1, maxLength: 100}
+                displayName: {type: string, minLength: 1, maxLength: 120}
+                specialties: {type: array, minItems: 1, maxItems: 20, items: {type: string, maxLength: 64}, uniqueItems: true}
+                skills: {type: array, minItems: 1, maxItems: 30, items: {type: object, additionalProperties: false, required: [code, level], properties: {code: {type: string}, level: {type: integer, minimum: 1, maximum: 5}}}}
+                availability: {enum: [available, unavailable]}
+                maxConcurrentAssignments: {type: integer, minimum: 1, maximum: 20}
+                shifts: {type: array, minItems: 1, maxItems: 7, items: {type: object, additionalProperties: false, required: [daysOfWeek, startTime, endTime, timeZone], properties: {daysOfWeek: {type: array, items: {type: integer, minimum: 0, maximum: 6}}, startTime: {type: string, pattern: '^[0-2][0-9]:[0-5][0-9]$'}, endTime: {type: string, pattern: '^[0-2][0-9]:[0-5][0-9]$'}, timeZone: {type: string}}}}
+                coordinates: {$ref: '#/components/schemas/Coordinates'}
+      responses: {'200': {description: Invitation created or idempotent replay with linked technician profile}, '403': {description: Tenant administrator required}, '409': {description: Existing identity conflicts with tenant membership}}
+  /technician/me:
+    get:
+      operationId: getMyTechnicianProfile
+      description: Requires the tenant technician role; profile resolves only from the verified Cognito sub.
+      responses: {'200': {description: Current linked technician profile}, '403': {description: Not a technician membership}, '404': {description: No active linked profile}}
+  /technician/work-orders:
+    get:
+      operationId: listMyMaintenanceOrders
+      description: Paginated work orders whose assignedTechnicianId belongs to the authenticated Cognito subject.
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+      responses: {'200': {description: Only this technician's assigned work orders}}
+  /technician/work-orders/{workOrderId}/analysis:
+    post:
+      operationId: explainMyMaintenanceOrder
+      description: Runs the existing intelligence provider only after verifying that this Cognito subject is assigned to the work order. Reports the actual provider source or evidence-only fallback.
+      parameters: [{$ref: '#/components/parameters/WorkOrderId'}]
+      responses: {'200': {description: Evidence-backed recommendations and actual provider source}, '404': {description: Not assigned to this account}}
+  /technician/work-orders/{workOrderId}/start:
+    post:
+      operationId: startMyMaintenanceOrder
+      parameters: [{$ref: '#/components/parameters/WorkOrderId'}]
+      responses: {'200': {description: Work started with actor audit history}, '404': {description: Not assigned to this account}, '409': {description: Invalid current state}}
+  /technician/work-orders/{workOrderId}/block:
+    post:
+      operationId: blockMyMaintenanceOrder
+      parameters: [{$ref: '#/components/parameters/WorkOrderId'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [notes], properties: {notes: {type: string, minLength: 1, maxLength: 2000}}}
+      responses: {'200': {description: Work order blocked with actor audit history}, '404': {description: Not assigned to this account}}
+  /technician/work-orders/{workOrderId}/complete:
+    post:
+      operationId: completeMyMaintenanceOrder
+      parameters: [{$ref: '#/components/parameters/WorkOrderId'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [notes], properties: {notes: {type: string, minLength: 1, maxLength: 2000}}}
+      responses: {'200': {description: Completion sent to an active workflow callback or persisted pending admin review}, '404': {description: Not assigned to this account}, '409': {description: Workflow callback is not ready}}
+  /technician/work-orders/{workOrderId}/reservations:
+    post:
+      operationId: reservePartForMyWorkOrder
+      parameters: [{$ref: '#/components/parameters/WorkOrderId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/ReservationRequest'}
+      responses: {'200': {description: Atomic reservation for an order assigned to this account}, '404': {description: Not assigned to this account}, '409': {description: Insufficient stock or idempotency conflict}}
+  /technician/work-orders/{workOrderId}/reservations/{reservationId}/consume:
+    post:
+      operationId: consumePartForMyWorkOrder
+      parameters: [{$ref: '#/components/parameters/WorkOrderId'}, {$ref: '#/components/parameters/ReservationId'}]
+      responses: {'200': {description: Reserved stock consumed once}, '404': {description: Reservation is not linked to this account's order}}
   /technicians:
     get:
       operationId: listAuraTechnicians
@@ -34,7 +132,6 @@ paths:
               maxConcurrentAssignments: 2
               shifts: [{daysOfWeek: [1, 2, 3, 4, 5], startTime: '08:00', endTime: '17:00', timeZone: America/Lima}]
               coordinates: {latitude: -12.0464, longitude: -77.0428, datum: WGS84}
-              cognitoSub: user-pool-subject
       responses: {'200': {description: Saved technician}, '400': {description: Invalid profile or tenantId in body}, '409': {description: Version conflict or duplicate technician}}
   /technicians/{technicianId}:
     parameters: [{$ref: '#/components/parameters/TechnicianId'}]
@@ -42,9 +139,17 @@ paths:
       operationId: getAuraTechnician
       responses: {'200': {description: Technician profile}, '404': {description: Technician not found}}
     patch:
-      operationId: archiveAuraTechnician
+      operationId: updateOrDeactivateAuraTechnician
       parameters: [{$ref: '#/components/parameters/IfMatch'}]
-      responses: {'200': {description: Technician archived (soft delete)}, '409': {description: Version conflict}}
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - {$ref: '#/components/schemas/Technician'}
+                - {type: object, additionalProperties: false, required: [action], properties: {action: {const: deactivate}}}
+      responses: {'200': {description: Versioned profile update or disabled Cognito account and technician profile}, '409': {description: Version conflict}}
   /machines/{machineId}/coordinates:
     put:
       operationId: putVerifiedMachineCoordinates
@@ -70,6 +175,18 @@ paths:
             schema: {$ref: '#/components/schemas/Part'}
             example: {partId: filter-044, name: Hydraulic filter, sku: HF-044, unit: each, minimumStock: 4}
       responses: {'200': {description: Created part}}
+  /inventory/parts/{partId}:
+    put:
+      operationId: updatePart
+      parameters:
+        - {name: partId, in: path, required: true, schema: {type: string}}
+        - {$ref: '#/components/parameters/IfMatch'}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/Part'}
+      responses: {'200': {description: Updated catalog part}, '409': {description: Version conflict}}
   /inventory/stock:
     get:
       operationId: listStock
@@ -132,7 +249,8 @@ paths:
               properties:
                 incidentIds: {type: array, minItems: 1, maxItems: 25, uniqueItems: true, items: {type: string}}
                 requirements: {type: object, additionalProperties: {type: array, maxItems: 12, items: {type: object, additionalProperties: false, required: [code, minLevel], properties: {code: {type: string}, minLevel: {type: integer, minimum: 1, maximum: 5}}}}}
-            example: {incidentIds: [incident-101, incident-102], requirements: {incident-101: [{code: hydraulic-diagnostics, minLevel: 3}]}}
+                dispatch: {type: boolean, default: true, description: Set false to wait for admin approval before starting the workflow.}
+            example: {incidentIds: [incident-101, incident-102], requirements: {incident-101: [{code: hydraulic-diagnostics, minLevel: 3}]}, dispatch: false}
       responses: {'200': {description: Assignments with candidate costs, explanation, workflowStarted and replayed}, '409': {description: Incident already coordinated or idempotency conflict}, '503': {description: Proposal persisted; retry the same idempotency key to resume dispatch}}
   /assignments:
     get:
@@ -173,6 +291,28 @@ paths:
               accepted: {value: {phase: confirmation, decision: accepted}}
               completed: {value: {phase: intervention, occurredAt: '2026-11-15T17:10:00Z', notes: Replaced the hydraulic filter and verified pressure}}
       responses: {'200': {description: Callback accepted (not a notification delivery receipt)}, '403': {description: Actor is not the assigned technician or tenant admin}, '409': {description: Callback already submitted or expired}}
+  /assignments/{assignmentId}/approval:
+    post:
+      operationId: approveAuraAssignment
+      description: Admin approves the recommended technician or selects a different persisted eligible candidate, then starts the workflow.
+      parameters: [{$ref: '#/components/parameters/AssignmentId'}, {$ref: '#/components/parameters/IfMatch'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, properties: {technicianId: {type: string}}}
+      responses: {'200': {description: Approved assignment and workflowStarted result}, '403': {description: Admin role required}, '409': {description: Candidate is no longer eligible or assignment changed}}
+  /maintenance/orders/{workOrderId}/review:
+    post:
+      operationId: reviewCompletedMaintenanceOrder
+      description: Admin approves completed maintenance or returns it to the assigned technician. Approval closes the related incident.
+      parameters: [{$ref: '#/components/parameters/WorkOrderId'}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: false, required: [decision, notes], properties: {decision: {enum: [approve, return]}, notes: {type: string, minLength: 1, maxLength: 2000}}}
+      responses: {'200': {description: Review persisted with actor and timestamp}, '403': {description: Admin role required}, '409': {description: Work order is not awaiting review}}
   /assignments/policy:
     get:
       operationId: getAssignmentPolicy
@@ -197,7 +337,15 @@ paths:
   /aura/events:
     get:
       operationId: listAuraEvents
-      parameters: [{$ref: '#/components/parameters/Limit'}, {$ref: '#/components/parameters/Cursor'}]
+      parameters:
+        - {$ref: '#/components/parameters/Limit'}
+        - {$ref: '#/components/parameters/Cursor'}
+        - {name: from, in: query, schema: {type: string, description: 'UTC date YYYY-MM-DD or timestamp'}}
+        - {name: to, in: query, schema: {type: string, description: 'UTC date YYYY-MM-DD or timestamp'}}
+        - {name: eventType, in: query, schema: {type: string, maxLength: 128}}
+        - {name: status, in: query, schema: {type: string, maxLength: 64}}
+        - {name: error, in: query, schema: {type: boolean}}
+        - {name: search, in: query, schema: {type: string, maxLength: 128}}
       responses: {'200': {description: Persisted AURA audit events; NotificationRequested means recorded, not delivered}}
 components:
   securitySchemes:
@@ -234,7 +382,6 @@ components:
         maxConcurrentAssignments: {type: integer, minimum: 1, maximum: 20}
         shifts: {type: array, minItems: 1, maxItems: 7, items: {type: object, additionalProperties: false, required: [daysOfWeek, startTime, endTime, timeZone], properties: {daysOfWeek: {type: array, items: {type: integer, minimum: 0, maximum: 6}}, startTime: {type: string, pattern: '^[0-2][0-9]:[0-5][0-9]$'}, endTime: {type: string, pattern: '^[0-2][0-9]:[0-5][0-9]$'}, timeZone: {type: string}}}}
         coordinates: {$ref: '#/components/schemas/Coordinates'}
-        cognitoSub: {type: string, maxLength: 128}
     Part:
       type: object
       additionalProperties: false

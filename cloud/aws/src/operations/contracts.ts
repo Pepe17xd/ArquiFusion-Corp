@@ -31,8 +31,10 @@ export interface OperationalRepository {
   createMany(records: OperationalRecord[]): Promise<void>;
   save(record: OperationalRecord, expectedVersion: number | null): Promise<void>;
   updateWithEvents(record: OperationalRecord, expectedVersion: number, events: OperationalRecord[]): Promise<void>;
+  createWorkOrderForIncident(incident: OperationalRecord, expectedVersion: number, workOrder: OperationalRecord, events: OperationalRecord[]): Promise<void>;
   queryByType(tenantId: string, entityType: OperationalEntityType, limit: number, cursor?: string): Promise<OperationalPage>;
   queryByMachine(tenantId: string, machineId: string, entityType: OperationalEntityType, limit: number, cursor?: string): Promise<OperationalPage>;
+  queryByAssignee?(tenantId: string, technicianId: string, limit: number, cursor?: string): Promise<OperationalPage>;
 }
 export class DuplicateOperationalRecordError extends Error {
   constructor() { super("An operational record already exists"); this.name = "DuplicateOperationalRecordError"; }

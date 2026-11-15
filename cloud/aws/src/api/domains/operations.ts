@@ -19,7 +19,9 @@ export const getAnomaly = (event: APIGatewayProxyEventV2) => getHandlers().getAn
 export const explainAnomaly = (event: APIGatewayProxyEventV2) => getHandlers().explainAnomaly(event);
 export const getAnomalyRules = (event: APIGatewayProxyEventV2) => getHandlers().getAnomalyRules(event);
 export const putAnomalyRules = (event: APIGatewayProxyEventV2) => getHandlers().putAnomalyRules(event);
+export const createIncident = (event: APIGatewayProxyEventV2) => getHandlers().createIncident(event);
 export const incidents = (event: APIGatewayProxyEventV2) => getHandlers().incidents(event);
+export const createIncidentMaintenanceOrder = (event: APIGatewayProxyEventV2) => getHandlers().createIncidentMaintenanceOrder(event);
 export const updateIncident = (event: APIGatewayProxyEventV2) => getHandlers().updateIncident(event);
 export const maintenanceOrders = (event: APIGatewayProxyEventV2) => getHandlers().maintenanceOrders(event);
 export const updateMaintenanceOrder = (event: APIGatewayProxyEventV2) => getHandlers().updateMaintenanceOrder(event);

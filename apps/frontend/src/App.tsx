@@ -12,7 +12,7 @@ import { ActivityView } from "./features/operations/ActivityView";
 import { OperationalModule } from "./features/operations/OperationalModule";
 import { IngestionView } from "./features/ingestion/IngestionView";
 import { IntelligenceWorkbench } from "./features/intelligence/IntelligenceWorkbench";
-import { authMode, selectedTenantId, signOut } from "./services/auth/session";
+import { authMode, selectedTenantId, selectedTenantRole, signOut } from "./services/auth/session";
 import "./style.css";
 import "./supervisor.css";
 import "./dashboard-redesign.css";
@@ -29,10 +29,19 @@ const headings: Record<AppView, [string, string]> = {
   technicians: ["Técnicos", "Disponibilidad y especialidades registradas en AURA."],
   incidents: ["Centro de incidentes", "Incidentes y respuesta según los registros disponibles."],
   orchestration: ["Orquestación", "Asignaciones AURA, confirmaciones y eventos persistidos."],
+  myPanel: ["Mi panel", "Tus trabajos activos y las siguientes acciones permitidas."],
+  myAssignments: ["Mis asignaciones", "Trabajos vinculados a tu cuenta técnica."],
+  myMachines: ["Máquinas asignadas", "Equipos asociados exclusivamente a tus trabajos."],
+  myMaintenance: ["Mis mantenimientos", "Seguimiento y actualización de tus órdenes."],
+  myParts: ["Repuestos solicitados", "Reservas asociadas a tus órdenes asignadas."],
+  myHistory: ["Historial personal", "Actividad registrada en tus trabajos."],
 };
 
+const technicianViews: AppView[] = ["myPanel", "myAssignments", "myMachines", "myMaintenance", "myParts", "myHistory"];
+
 export default function App() {
-  const [view, setView] = useState<AppView>(() => { const target = window.location.hash.slice(1); return ["fleet", "agents", "activity", "ingestion", "maintenance", "inventory", "technicians", "incidents", "orchestration"].includes(target) ? target as AppView : "command"; });
+  const role = authMode === "local" ? "owner" : selectedTenantRole() ?? "viewer";
+  const [view, setView] = useState<AppView>(() => { const target = window.location.hash.slice(1) as AppView; const allowed = role === "technician" ? technicianViews : ["command", "fleet", "agents", "activity", "ingestion", "maintenance", "inventory", "technicians", "incidents", "orchestration"] as AppView[]; return allowed.includes(target) ? target : role === "technician" ? "myPanel" : "command"; });
   const [metrics, setMetrics] = useState<FleetMetrics | null>(null);
   const [overview, setOverview] = useState<OperationsOverview | null>(null);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
@@ -179,14 +188,16 @@ export default function App() {
   }
 
   function navigate(target: AppView) {
+    if (role === "technician" && !technicianViews.includes(target)) target = "myPanel";
+    if (role !== "technician" && technicianViews.includes(target)) target = "command";
     if (target === "command") { setPageNumber(1); setSearch(""); setSearchInput(""); setStatus(""); setCategory(""); }
     setView(target); setMobileMenu(false);
   }
 
   return <div className="app-frame">
-    <div className="rail-wrap"><NavigationRail view={view} onNavigate={navigate} connected={connected} checking={checking} fleetCount={metrics?.total ?? 0}/></div>
+    <div className="rail-wrap"><NavigationRail view={view} onNavigate={navigate} connected={connected} checking={checking} fleetCount={metrics?.total ?? 0} role={role}/></div>
     <div className="main-column">
-      <TopBar view={view} onNavigate={navigate} connected={connected} checking={checking} dateTime={now} onRefresh={() => void load()} refreshing={loading} mobileMenu={mobileMenu} onMenu={() => setMobileMenu((open) => !open)} organization={organization} onSignOut={authMode === "cognito" ? signOut : undefined}/>
+      <TopBar view={view} onNavigate={navigate} connected={connected} checking={checking} dateTime={now} onRefresh={() => void load()} refreshing={loading} mobileMenu={mobileMenu} onMenu={() => setMobileMenu((open) => !open)} organization={organization} role={role} onSignOut={authMode === "cognito" ? signOut : undefined}/>
       <main className="content-area">
         {(error || notice) && <FeedbackBanner kind={error ? "error" : "success"} onDismiss={() => { setError(""); setNotice(""); }}>{error || notice}</FeedbackBanner>}
         <div className="page-intro"><div><div className="eyebrow">ARQUIFUSION / OPERACIONES</div><h1>{headings[view][0]}</h1><p>{headings[view][1]}</p></div>{view !== "ingestion" && <span className="data-origin"><span className={`origin-led ${connected ? "online" : checking ? "checking" : "offline"}`}/>{connected ? "DATOS DE API" : checking ? "REVISANDO API" : "API SIN CONEXIÓN"}</span>}</div>
@@ -195,7 +206,7 @@ export default function App() {
         {view === "agents" && <AgentCommand result={recommendationResult} loading={intelligenceLoading} onRun={runIntelligence} onOpenMachine={openMachine} machines={machines} task={task} error={intelligenceError} selectedMachineId={selectedMachineId} onSelectMachine={setSelectedMachineId} onRefreshTask={refreshTask}/>}
         {view === "activity" && <ActivityView events={events} error={eventsError} loading={loading}/>}
         {view === "ingestion" && <IngestionView importing={importing} onFile={ingest}/>}
-        {["maintenance", "inventory", "technicians", "incidents", "orchestration"].includes(view) && <OperationalModule view={view} onNavigate={navigate}/>}
+        {["maintenance", "inventory", "technicians", "incidents", "orchestration", ...technicianViews].includes(view) && <OperationalModule view={view} onNavigate={navigate} role={role}/>}
         <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>PLATAFORMA DE OPERACIONES</span></footer>
       </main>
     </div>

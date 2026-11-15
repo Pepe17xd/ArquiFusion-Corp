@@ -85,6 +85,8 @@ function resolveRoute(method: string, pathname: string, handlers: HandlerSet): {
   if (method === "GET" && path === "/anomaly-rules") return { handler: handlers.getAnomalyRules as LocalHandler };
   if (method === "PUT" && path === "/anomaly-rules") return { handler: handlers.putAnomalyRules as LocalHandler };
   if (method === "GET" && path === "/incidents") return { handler: handlers.incidents as LocalHandler };
+  if (method === "POST" && path === "/incidents") return { handler: handlers.createIncident as LocalHandler };
+  if (method === "POST" && /^\/incidents\/[^/]+\/maintenance-orders$/.test(path)) return { handler: handlers.createIncidentMaintenanceOrder as LocalHandler, pathParameters: { incidentId: decodeURIComponent(path.split("/")[2]) } };
   if (method === "GET" && path === "/maintenance/orders") return { handler: handlers.maintenanceOrders as LocalHandler };
   if (method === "GET" && path === "/operations/events") return { handler: handlers.operationalEvents as LocalHandler };
   if (method === "PATCH" && /^\/incidents\/[^/]+$/.test(path)) return { handler: handlers.updateIncident as LocalHandler, pathParameters: { incidentId: decodeURIComponent(path.split("/").at(-1)!) } };

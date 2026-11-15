@@ -29,8 +29,11 @@ export function AuthGate({ children }: { children: ReactNode }) {
           if (!active) return;
           setTenants(choices);
           const selected = selectedTenantId();
-          if (selected && choices.some((entry) => entry.tenant.tenantId === selected)) setTenantId(selected);
-          else if (choices.length === 1) { selectTenant(choices[0].tenant.tenantId); setTenantId(choices[0].tenant.tenantId); }
+          if (selected && choices.some((entry) => entry.tenant.tenantId === selected)) {
+            const choice = choices.find((entry) => entry.tenant.tenantId === selected)!;
+            selectTenant(selected, choice.membership.role); setTenantId(selected);
+          }
+          else if (choices.length === 1) { selectTenant(choices[0].tenant.tenantId, choices[0].membership.role); setTenantId(choices[0].tenant.tenantId); }
           else { clearTenant(); setTenantId(undefined); }
         }
       } catch (reason) { if (active) setError(reason instanceof Error ? reason.message : "No se pudo iniciar la sesión."); }
@@ -49,7 +52,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
     setBusy(true); setError("");
     try {
       const created = await apiSession.createTenant(tenantName.trim(), tenantRequestKey);
-      const next = [...tenants, created]; setTenants(next); selectTenant(created.tenant.tenantId); setTenantId(created.tenant.tenantId);
+      const next = [...tenants, created]; setTenants(next); selectTenant(created.tenant.tenantId, created.membership.role); setTenantId(created.tenant.tenantId);
     } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo crear el espacio de trabajo."); }
     finally { setBusy(false); }
   }
@@ -68,7 +71,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   </div><div className="auth-ambient" aria-hidden="true"><div className="auth-orbit orbit-a"/><div className="auth-orbit orbit-b"/><div className="auth-core"/></div></section>;
   if (!tenantId) return <section className="auth-shell"><div className="auth-panel">
     <span className="auth-kicker">SELECCIÓN DE ESPACIO</span><h1>Elija su organización</h1><p>La flota, las tareas y los archivos se aíslan por organización.</p>
-    {tenants.length > 0 && <div className="tenant-options">{tenants.map((entry) => <button key={entry.tenant.tenantId} onClick={() => { selectTenant(entry.tenant.tenantId); setTenantId(entry.tenant.tenantId); }}><span>{entry.tenant.name}</span><small>Rol: {entry.membership.role}</small></button>)}</div>}
+    {tenants.length > 0 && <div className="tenant-options">{tenants.map((entry) => <button key={entry.tenant.tenantId} onClick={() => { selectTenant(entry.tenant.tenantId, entry.membership.role); setTenantId(entry.tenant.tenantId); }}><span>{entry.tenant.name}</span><small>Rol: {entry.membership.role}</small></button>)}</div>}
     <form className="tenant-create" onSubmit={createTenant}><label htmlFor="tenant-name">Crear organización</label><input id="tenant-name" value={tenantName} onChange={(event) => setTenantName(event.target.value)} maxLength={120} required placeholder="Nombre de la organización"/><button className="auth-primary" disabled={busy}>{busy ? "Creando…" : "Crear espacio"}</button></form>
     {error && <div className="auth-error" role="alert">{error}</div>}<button className="auth-link" onClick={signOut}>Cerrar sesión</button>
   </div></section>;

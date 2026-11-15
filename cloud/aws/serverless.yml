@@ -44,6 +44,11 @@ functions:
     role: ${env:TENANT_WRITE_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
     events:
       - httpApi: {path: /tenants, method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
+  addTechnicianMember:
+    handler: dist/api/domains/platform.addTechnician
+    role: ${env:TENANT_WRITE_ROLE_ARN, env:AWS_LAMBDA_ROLE_ARN}
+    events:
+      - httpApi: {path: '/tenants/{tenantId}/members', method: POST, authorizer: {name: cognito, scopes: [arquifusion/write]}}
 resources:
   Resources:
     # Existing machine data is retained; the tenant-keyed table is the active fleet store.

@@ -69,6 +69,14 @@ functions:
     handler: src/api/domains/operations.incidents
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /incidents, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  createIncident:
+    handler: src/api/domains/operations.createIncident
+    role: ${env:OPERATIONS_WRITE_ROLE_ARN}
+    events: [{httpApi: {path: /incidents, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  createIncidentMaintenanceOrder:
+    handler: src/api/domains/operations.createIncidentMaintenanceOrder
+    role: ${env:OPERATIONS_WRITE_ROLE_ARN}
+    events: [{httpApi: {path: '/incidents/{incidentId}/maintenance-orders', method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   updateIncident:
     handler: src/api/domains/operations.updateIncident
     role: ${env:OPERATIONS_WRITE_ROLE_ARN}
@@ -105,6 +113,8 @@ resources:
           - {AttributeName: gsi1sk, AttributeType: S}
           - {AttributeName: gsi2pk, AttributeType: S}
           - {AttributeName: gsi2sk, AttributeType: S}
+          - {AttributeName: gsi3pk, AttributeType: S}
+          - {AttributeName: gsi3sk, AttributeType: S}
         KeySchema: [{AttributeName: pk, KeyType: HASH}, {AttributeName: sk, KeyType: RANGE}]
         GlobalSecondaryIndexes:
           - IndexName: ByTenantMachine
@@ -112,6 +122,9 @@ resources:
             Projection: {ProjectionType: ALL}
           - IndexName: ByTenantType
             KeySchema: [{AttributeName: gsi2pk, KeyType: HASH}, {AttributeName: gsi2sk, KeyType: RANGE}]
+            Projection: {ProjectionType: ALL}
+          - IndexName: ByTenantAssignee
+            KeySchema: [{AttributeName: gsi3pk, KeyType: HASH}, {AttributeName: gsi3sk, KeyType: RANGE}]
             Projection: {ProjectionType: ALL}
         TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
         PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}

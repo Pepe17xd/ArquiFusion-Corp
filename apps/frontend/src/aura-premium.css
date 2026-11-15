@@ -82,6 +82,15 @@ body { background: radial-gradient(ellipse at 68% -20%, #18406466, transparent 4
 .assignment-cost-factors { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }.assignment-cost-factors span { padding: 4px 7px; border: 1px solid #24435f; border-radius: 5px; color: #90acc5; background: #0a2037; font: 9px ui-monospace, monospace; }
 .module-subheading { display: flex; align-items: baseline; gap: 12px; margin-top: 8px; }.module-subheading h3 { margin: 0; font-size: 14px; }.module-subheading span { color: #7d98ac; font-size: 10px; }
 .module-timeline { display: grid; }.module-timeline article { display: flex; align-items: center; gap: 12px; padding: 12px 4px; border-bottom: 1px solid #183650; }.timeline-mark { display: grid; place-items: center; width: 28px; height: 28px; border: 1px solid #2d5c76; border-radius: 50%; color: var(--cyan); }.module-timeline article>div { flex: 1; }.module-timeline b { font-size: 11px; }.module-timeline p { margin: 4px 0; color: #9db5c8; font-size: 10px; }.module-timeline small, .timeline-status { color: #718ba2; font-size: 9px; }.timeline-status { padding: 4px 7px; border: 1px solid #295844; border-radius: 99px; color: #7dd9ae; }
+ .activity-filters { margin: 18px 0; padding: 13px; border: 1px solid #1e3d59; border-radius: 8px; background: #0a2037; }
+.activity-filters input, .activity-filters select { width: min(210px, 55vw); min-height: 36px; padding: 0 9px; color: var(--text); background: #091c2d; border: 1px solid #254763; border-radius: 6px; }
+.activity-pagination { display: flex; align-items: center; justify-content: center; gap: 18px; padding: 13px; color: #8da8bd; font-size: 10px; }
+.activity-pagination button, .activity-audit .module-link { display: inline-flex; align-items: center; gap: 5px; border: 1px solid #254763; border-radius: 6px; padding: 7px 10px; color: #b8d5e9; background: #102d42; }
+.activity-pagination button:disabled { opacity: .45; cursor: not-allowed; }
+.event-rows details { min-width: 90px; color: #8edced; font-size: 10px; }
+.event-rows pre { position: absolute; z-index: 2; max-width: min(560px, 80vw); max-height: 260px; overflow: auto; padding: 12px; border: 1px solid #2b5470; border-radius: 7px; background: #071522; color: #c5dcec; white-space: pre-wrap; }
+.activity-audit>h3 { margin: 22px 0 8px; color: #b9d4e8; font-size: 12px; }
+@media (max-width: 600px) { .activity-filters input, .activity-filters select { width: min(100%, 290px); }.activity-pagination { justify-content: space-between; gap: 8px; } }
 @keyframes module-in { from { opacity: .45; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @keyframes shimmer { to { background-position: -220% 0; } }
 @media (max-width: 850px) { :root { --rail: 64px; } }

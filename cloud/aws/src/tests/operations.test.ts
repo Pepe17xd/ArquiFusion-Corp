@@ -21,9 +21,10 @@ test("telemetry schema validates unit-bearing metric fields, bounds, timestamps 
   assert.throws(() => validateBatch({ readings: [{ machineId: "EQ-1", timestamp: iso(), metrics: { temperatureC: 251 } }] }), /Validation failed/);
   assert.throws(() => validateBatch({ readings: [{ machineId: "EQ-1", timestamp: "2026-01-01T00:00:00", metrics: { rpm: 100 } }] }), /Validation failed/);
   assert.throws(() => validateBatch({ readings: [{ machineId: "EQ-1", timestamp: "2026-02-30T00:00:00Z", metrics: { rpm: 100 } }] }), /Validation failed/);
+  const duplicateTimestamp = iso(1);
   assert.throws(() => validateBatch({ readings: [
-    { machineId: "EQ-1", timestamp: iso(1), metrics: { rpm: 10 } },
-    { machineId: "EQ-1", timestamp: iso(1), metrics: { rpm: 12 } },
+    { machineId: "EQ-1", timestamp: duplicateTimestamp, metrics: { rpm: 10 } },
+    { machineId: "EQ-1", timestamp: duplicateTimestamp, metrics: { rpm: 12 } },
   ] }), /Validation failed/);
 });
 
@@ -35,6 +36,29 @@ test("anomaly thresholds follow metric units and allow valid negative temperatur
     const service = new OperationsService(repo, machines);
     await service.saveRules("tenant-rules", [{ ruleId: "cold", title: "Cold", explanation: "Below threshold", severity: "warning", match: "all", conditions: [{ metric: "temperatureC", operator: "lt", threshold: -20 }], enabled: true }]);
     assert.throws(() => validateRules({ rules: [{ ruleId: "bad", title: "Bad", explanation: "Outside range", severity: "warning", match: "all", enabled: true, conditions: [{ metric: "rpm", operator: "gte", threshold: -1 }] }] }), /Validation failed/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("manual incident and corrective order creation are tenant scoped and idempotent without AI output", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "arquifusion-manual-incident-"));
+  try {
+    const machines = new LocalMachineRepository(join(dir, "machines.json"));
+    await machines.upsert(normalizeMachine({ machineId: "EQ-MANUAL", model: "Loader", category: "Loader", location: "Yard", status: "operational" }, "json", "tenant-manual"));
+    const repo = new LocalOperationalRepository(join(dir, "operations.json"));
+    const service = new OperationsService(repo, machines);
+    const input = { machineId: "EQ-MANUAL", type: "hydraulic-leak", severity: "warning" as const, description: "Visible leak during inspection" };
+    const first = await service.createManualIncident("tenant-manual", "manual-incident-key", input, { userSub: "admin-sub", role: "admin" });
+    const replay = await service.createManualIncident("tenant-manual", "manual-incident-key", input, { userSub: "admin-sub", role: "admin" });
+    assert.equal(first.replayed, false);
+    assert.equal(replay.replayed, true);
+    await assert.rejects(service.createManualIncident("tenant-manual", "manual-incident-key", { ...input, description: "changed" }, { userSub: "admin-sub", role: "admin" }), /different incident data/);
+    const createdOrder = await service.createWorkOrderFromIncident("tenant-manual", first.incident.entityId, { userSub: "admin-sub", role: "admin" });
+    const orderReplay = await service.createWorkOrderFromIncident("tenant-manual", first.incident.entityId, { userSub: "admin-sub", role: "admin" });
+    assert.equal(createdOrder.replayed, false);
+    assert.equal(orderReplay.replayed, true);
+    assert.equal(createdOrder.workOrder.status, "planned");
+    assert.equal(createdOrder.workOrder.anomalyId, undefined);
+    assert.equal(await repo.get("other-tenant", "INCIDENT", first.incident.entityId), undefined);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 
@@ -112,6 +136,21 @@ test("operational endpoint enforces Cognito tenant isolation and idempotent anom
     assert.equal((await updated.json() as { data: { version: number; status: string } }).data.version, 2);
     const stale = await request("token-a", `/incidents/${incidents[0].entityId}`, { method: "PATCH", headers: { "content-type": "application/json", "if-match": "1" }, body: JSON.stringify({ status: "resolved", resolution: "done" }) });
     assert.equal(stale.status, 409);
+
+    const manual = await request("token-a", "/incidents", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": "manual-demo-incident" }, body: JSON.stringify({ machineId: "EQ-1", type: "hydraulic-leak", severity: "warning", description: "Observed during operator inspection" }) });
+    assert.equal(manual.status, 200);
+    const manualIncident = (await manual.json() as { data: { incident: { entityId: string; status: string }; replayed: boolean } }).data;
+    assert.equal(manualIncident.incident.status, "open");
+    assert.equal(manualIncident.replayed, false);
+    const manualReplay = await request("token-a", "/incidents", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": "manual-demo-incident" }, body: JSON.stringify({ machineId: "EQ-1", type: "hydraulic-leak", severity: "warning", description: "Observed during operator inspection" }) });
+    assert.equal((await manualReplay.json() as { data: { replayed: boolean } }).data.replayed, true);
+    const orderResponse = await request("token-a", `/incidents/${manualIncident.incident.entityId}/maintenance-orders`, { method: "POST" });
+    assert.equal(orderResponse.status, 200);
+    const manualOrder = (await orderResponse.json() as { data: { workOrder: { incidentId: string; status: string; anomalyId?: string } } }).data.workOrder;
+    assert.equal(manualOrder.incidentId, manualIncident.incident.entityId);
+    assert.equal(manualOrder.status, "planned");
+    assert.equal(manualOrder.anomalyId, undefined);
+    assert.equal((await request("token-b", `/incidents/${manualIncident.incident.entityId}/maintenance-orders`, { method: "POST" })).status, 404);
   } finally { await close(server); await rm(dir, { recursive: true, force: true }); }
 });
 

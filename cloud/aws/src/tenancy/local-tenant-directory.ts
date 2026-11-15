@@ -4,16 +4,21 @@ import type { Tenant, TenantContext, TenantDirectory, TenantMembership } from ".
 import { isTenantRole, TenantAccessError, TenantConflictError } from "./contracts";
 import { atomicWriteFile } from "../storage/local-file";
 
-interface LocalDirectoryData { tenants: Tenant[]; memberships: TenantMembership[]; creationRequests?: Record<string, string> }
+interface LocalDirectoryData { tenants: Tenant[]; memberships: TenantMembership[]; creationRequests?: Record<string, string>; disabledUsers?: string[] }
 
 /** Explicit local-only identity/membership simulation. It is never selected in cloud mode. */
 export class LocalTenantDirectory implements TenantDirectory {
   private pending: Promise<void> = Promise.resolve();
   constructor(private readonly file: string, private readonly localUserSub = "local-dev-user", private readonly localTenantId = "local-demo") {}
 
+  async assertUserActive(userSub: string) {
+    const data = await this.read();
+    if (data.disabledUsers?.includes(userSub)) throw new TenantAccessError("The user account is disabled");
+  }
+
   async resolve(userSub: string, requestedTenantId?: string): Promise<TenantContext> {
     const data = await this.read();
-    const matches = data.memberships.filter((item) => item.userSub === userSub);
+    const matches = data.memberships.filter((item) => item.userSub === userSub && item.status !== "disabled");
     const selected = requestedTenantId ? matches.find((item) => item.tenantId === requestedTenantId) : matches.length === 1 ? matches[0] : undefined;
     if (!selected || !isTenantRole(selected.role)) throw new TenantAccessError(matches.length > 1 && !requestedTenantId ? "Select a tenant membership before accessing tenant data" : undefined);
     const tenant = data.tenants.find((item) => item.tenantId === selected.tenantId);
@@ -23,7 +28,7 @@ export class LocalTenantDirectory implements TenantDirectory {
 
   async listForUser(userSub: string) {
     const data = await this.read();
-    return data.memberships.filter((membership) => membership.userSub === userSub).flatMap((membership) => {
+    return data.memberships.filter((membership) => membership.userSub === userSub && membership.status !== "disabled").flatMap((membership) => {
       const tenant = data.tenants.find((item) => item.tenantId === membership.tenantId);
       return tenant ? [{ tenant, membership }] : [];
     });
@@ -53,6 +58,43 @@ export class LocalTenantDirectory implements TenantDirectory {
       const membership: TenantMembership = { tenantId: tenant.tenantId, userSub, role: "owner", createdAt: tenant.createdAt };
       data.tenants.push(tenant); data.memberships.push(membership); data.creationRequests[requestKey] = tenant.tenantId; await this.write(data);
       return { tenant, membership };
+    });
+  }
+
+  async addTechnicianMember(tenantId: string, userSub: string): Promise<TenantMembership> {
+    if (!userSub || userSub.length > 128) throw new TenantAccessError("A valid Cognito subject is required");
+    return this.serial(async () => {
+      const data = await this.read();
+      if (data.disabledUsers?.includes(userSub)) throw new TenantAccessError("The user account is disabled");
+      if (!data.tenants.some((tenant) => tenant.tenantId === tenantId && tenant.status === "active")) throw new TenantAccessError("The requested organization is unavailable");
+      const elsewhere = data.memberships.find((item) => item.userSub === userSub && item.tenantId !== tenantId && item.status !== "disabled");
+      if (elsewhere) throw new TenantConflictError("The account already belongs to another organization");
+      const current = data.memberships.find((item) => item.tenantId === tenantId && item.userSub === userSub);
+      if (current?.role === "technician" && current.status !== "disabled") return current;
+      if (current) throw new TenantConflictError("An existing tenant membership cannot be changed by technician provisioning");
+      const membership: TenantMembership = { tenantId, userSub, role: "technician", createdAt: new Date().toISOString(), status: "active" };
+      data.memberships.push(membership); await this.write(data); return membership;
+    });
+  }
+
+  async disableTechnicianMember(tenantId: string, userSub: string) {
+    await this.serial(async () => {
+      const data = await this.read();
+      const membership = data.memberships.find((item) => item.tenantId === tenantId && item.userSub === userSub);
+      if (!membership) return;
+      if (membership.role !== "technician") throw new TenantConflictError("Only technician memberships can be disabled by this operation");
+      membership.status = "disabled";
+      await this.write(data);
+    });
+  }
+
+  async disableUser(userSub: string) {
+    await this.serial(async () => {
+      const data = await this.read();
+      data.disabledUsers ??= [];
+      if (!data.disabledUsers.includes(userSub)) data.disabledUsers.push(userSub);
+      for (const membership of data.memberships) if (membership.userSub === userSub) membership.status = "disabled";
+      await this.write(data);
     });
   }
 

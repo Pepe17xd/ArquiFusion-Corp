@@ -12,3 +12,4 @@ function getHandlers() { return handlers ??= createHandlers(); }
 export const health = (event: APIGatewayProxyEventV2) => getHandlers().health(event);
 export const listTenants = (event: APIGatewayProxyEventV2) => getHandlers().listTenants(event);
 export const createTenant = (event: APIGatewayProxyEventV2) => getHandlers().createTenant(event);
+export const addTechnician = (event: APIGatewayProxyEventV2) => getHandlers().addTechnician(event);

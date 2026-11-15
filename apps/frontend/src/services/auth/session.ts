@@ -22,6 +22,7 @@ const session = createSessionClient({
 });
 
 export const selectedTenantId = session.selectedTenantId;
+export const selectedTenantRole = session.selectedTenantRole;
 export const selectTenant = session.selectTenant;
 export const clearTenant = session.clearTenant;
 export const clearSession = session.clearSession;

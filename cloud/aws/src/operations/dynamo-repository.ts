@@ -24,12 +24,7 @@ export class DynamoOperationalRepository implements OperationalRepository {
         TransactItems: records.map((record) => ({
           Put: {
             TableName: this.table,
-            Item: {
-              ...record,
-              pk: tenantPk(record.tenantId), sk: keyOf(record.entityType, record.entityId),
-              ...(record.machineId ? { gsi1pk: machinePk(record.tenantId, record.machineId), gsi1sk: `${record.entityType}#${record.createdAt}#${record.entityId}` } : {}),
-              gsi2pk: typePk(record.tenantId, record.entityType), gsi2sk: `${record.createdAt}#${record.entityId}`,
-            },
+            Item: toItem(record),
             ConditionExpression: "attribute_not_exists(pk) AND attribute_not_exists(sk)",
           },
         })),
@@ -48,11 +43,7 @@ export class DynamoOperationalRepository implements OperationalRepository {
     try {
       await this.db.send(new PutCommand({
         TableName: this.table,
-        Item: {
-          ...record, pk: tenantPk(record.tenantId), sk: keyOf(record.entityType, record.entityId),
-          ...(record.machineId ? { gsi1pk: machinePk(record.tenantId, record.machineId), gsi1sk: `${record.entityType}#${record.createdAt}#${record.entityId}` } : {}),
-          gsi2pk: typePk(record.tenantId, record.entityType), gsi2sk: `${record.createdAt}#${record.entityId}`,
-        },
+        Item: toItem(record),
         ConditionExpression: expectedVersion === null ? "attribute_not_exists(pk) AND attribute_not_exists(sk)" : "#version = :expectedVersion",
         ExpressionAttributeNames: expectedVersion === null ? undefined : { "#version": "version" },
         ExpressionAttributeValues: expectedVersion === null ? undefined : { ":expectedVersion": expectedVersion },
@@ -75,12 +66,36 @@ export class DynamoOperationalRepository implements OperationalRepository {
     }
   }
 
+  async createWorkOrderForIncident(incident: OperationalRecord, expectedVersion: number, workOrder: OperationalRecord, events: OperationalRecord[]): Promise<void> {
+    try {
+      await this.db.send(new TransactWriteCommand({ TransactItems: [
+        { Put: { TableName: this.table, Item: toItem(incident), ConditionExpression: "#version = :expectedVersion", ExpressionAttributeNames: { "#version": "version" }, ExpressionAttributeValues: { ":expectedVersion": expectedVersion } } },
+        ...[workOrder, ...events].map((record) => ({ Put: { TableName: this.table, Item: toItem(record), ConditionExpression: "attribute_not_exists(pk) AND attribute_not_exists(sk)" } })),
+      ] }));
+    } catch (error) {
+      if (isConditionalFailure(error)) throw new OperationalConflictError();
+      throw error;
+    }
+  }
+
   queryByType(tenantId: string, entityType: OperationalEntityType, limit: number, cursor?: string) {
     return this.query("ByTenantType", typePk(tenantId, entityType), limit, cursor, tenantId, entityType);
   }
 
   queryByMachine(tenantId: string, machineId: string, entityType: OperationalEntityType, limit: number, cursor?: string) {
     return this.query("ByTenantMachine", machinePk(tenantId, machineId), limit, cursor, tenantId, entityType, `${entityType}#`);
+  }
+
+  async queryByAssignee(tenantId: string, technicianId: string, limit: number, cursor?: string): Promise<OperationalPage> {
+    const partition = assigneePk(tenantId, technicianId);
+    let ExclusiveStartKey: Record<string, unknown> | undefined;
+    if (cursor) {
+      try { const key = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")) as Record<string, unknown>; if (key.pk !== tenantPk(tenantId) || key.gsi3pk !== partition || typeof key.sk !== "string" || typeof key.gsi3sk !== "string") throw new Error(); ExclusiveStartKey = key; }
+      catch { throw new ValidationError(["Invalid technician work-order cursor"]); }
+    }
+    const result = await this.db.send(new QueryCommand({ TableName: this.table, IndexName: "ByTenantAssignee", KeyConditionExpression: "gsi3pk = :partition", ExpressionAttributeValues: { ":partition": partition }, Limit: limit, ScanIndexForward: false, ExclusiveStartKey }));
+    const lastKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+    return { items: (result.Items ?? []).map(stripKeys).filter((item) => item.tenantId === tenantId && item.entityType === "WORK_ORDER" && item.assignedTechnicianId === technicianId), nextCursor: lastKey ? Buffer.from(JSON.stringify(lastKey)).toString("base64url") : undefined };
   }
 
   private async query(index: string, partition: string, limit: number, cursor: string | undefined, tenantId: string, entityType: OperationalEntityType, beginsWith?: string): Promise<OperationalPage> {
@@ -99,7 +114,7 @@ export class DynamoOperationalRepository implements OperationalRepository {
 }
 
 function stripKeys(item: Record<string, unknown>): OperationalRecord {
-  const { pk: _pk, sk: _sk, gsi1pk: _gsi1pk, gsi1sk: _gsi1sk, gsi2pk: _gsi2pk, gsi2sk: _gsi2sk, ...record } = item;
+  const { pk: _pk, sk: _sk, gsi1pk: _gsi1pk, gsi1sk: _gsi1sk, gsi2pk: _gsi2pk, gsi2sk: _gsi2sk, gsi3pk: _gsi3pk, gsi3sk: _gsi3sk, ...record } = item;
   return record as OperationalRecord;
 }
 function toItem(record: OperationalRecord) {
@@ -107,8 +122,10 @@ function toItem(record: OperationalRecord) {
     ...record, pk: tenantPk(record.tenantId), sk: keyOf(record.entityType, record.entityId),
     ...(record.machineId ? { gsi1pk: machinePk(record.tenantId, record.machineId), gsi1sk: `${record.entityType}#${record.createdAt}#${record.entityId}` } : {}),
     gsi2pk: typePk(record.tenantId, record.entityType), gsi2sk: `${record.createdAt}#${record.entityId}`,
+    ...(record.entityType === "WORK_ORDER" && typeof record.assignedTechnicianId === "string" ? { gsi3pk: assigneePk(record.tenantId, record.assignedTechnicianId), gsi3sk: `${record.updatedAt}#${record.entityId}` } : {}),
   };
 }
+const assigneePk = (tenantId: string, technicianId: string) => `${tenantPk(tenantId)}#TECHNICIAN#${technicianId}`;
 function decodeCursor(cursor: string, expectedPartition: string, sortPrefix?: string): Record<string, unknown> {
   try {
     const value: unknown = JSON.parse(Buffer.from(cursor, "base64url").toString("utf8"));
