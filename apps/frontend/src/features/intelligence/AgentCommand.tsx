@@ -4,6 +4,8 @@ import { AgentStatusBadge } from "../../components/ui/StatusBadge";
 import { MascotMark, type AgentRole } from "../../components/agents/MascotMark";
 import { WorkflowPanel } from "../../components/agents/WorkflowPanel";
 import type { Machine, RecommendationResult } from "../../services/api/client";
+import type { AgentTask } from "../../services/api/client";
+import { IntelligenceWorkbench } from "./IntelligenceWorkbench";
 
 const agents: { id: AgentRole; name: string; role: string; desc: string; specialty: string }[] = [
   { id: "coordinator", name: "Agente coordinador", role: "Organización del ecosistema", specialty: "Coordinación", desc: "Coordinará el trabajo entre especialidades. No existe todavía una implementación de este agente en el backend." },
@@ -14,8 +16,9 @@ const agents: { id: AgentRole; name: string; role: string; desc: string; special
   { id: "incidents", name: "Agente de inteligencia de incidentes", role: "Análisis y relaciones de incidentes", specialty: "Incidentes", desc: "Analizará incidentes y sus relaciones una vez que el backend disponga de los registros correspondientes." },
 ];
 
-export function AgentCommand({ result, loading, onRun, onOpenMachine }: {
+export function AgentCommand({ result, loading, onRun, onOpenMachine, machines, task, error, selectedMachineId, onSelectMachine, onRefreshTask }: {
   result: RecommendationResult | null; loading: boolean; onRun: () => void; onOpenMachine: (id: string) => void;
+  machines: Machine[]; task: AgentTask | null; error: string; selectedMachineId: string; onSelectMachine: (id: string) => void; onRefreshTask: () => void;
 }) {
   const [selected, setSelected] = useState<AgentRole>("coordinator");
   const agent = agents.find((item) => item.id === selected)!;
@@ -34,6 +37,7 @@ export function AgentCommand({ result, loading, onRun, onOpenMachine }: {
         <div className="planned-detail"><Clock3 size={20}/><b>Capacidad planificada</b><span>No dispone de endpoint, ejecución, entradas ni historial de resultados en el backend.</span></div>
       </section>
     </div>
+    <IntelligenceWorkbench machines={machines} selectedMachineId={selectedMachineId} onSelectMachine={onSelectMachine} task={task} busy={loading} error={error} onRun={onRun} onRefresh={onRefreshTask}/>
     <WorkflowPanel result={result} loading={loading} onRun={onRun} onOpenAgents={() => setSelected("coordinator")}/>
   </div>;
 }

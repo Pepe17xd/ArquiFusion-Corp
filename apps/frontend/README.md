@@ -1,6 +1,6 @@
 # Cloudflare Pages: frontend
 
-Aplicación React 18 y Vite. En Cloudflare Pages configura la raíz del proyecto como la raíz del monorepo para que `npm ci` use el lockfile raíz.
+Aplicación React 18 y Vite. En Cloudflare Pages configura la raíz del proyecto como la raíz del monorepo para que `npm ci` use el lockfile raíz. El frontend consume la API pública de AWS desde un cliente HTTP centralizado y nunca conecta directamente con Gemini.
 
 ## Build y prueba local
 
@@ -12,7 +12,7 @@ npm run test --workspace @arquifusion/frontend
 npm run build --workspace @arquifusion/frontend
 ```
 
-El comando de build de Pages es `npm run build --workspace @arquifusion/frontend`; el directorio de salida es `apps/frontend/dist`. `public/_redirects` conserva las rutas de React (incluida `/auth/callback`) al refrescar una URL profunda.
+El comando de build de Pages es `npm run build --workspace @arquifusion/frontend`; el directorio de salida es `apps/frontend/dist`. Configura el directorio raíz como `/` (raíz del monorepo) para que Cloudflare use el `package-lock.json` raíz. `public/_redirects` conserva las rutas de React (incluida `/auth/callback`) al refrescar una URL profunda.
 
 ### Comprobación manual de la navegación
 
@@ -22,13 +22,13 @@ Para desplegar, crea un proyecto Pages en Cloudflare, conecta el repositorio, us
 
 ## Variables de build
 
-- `VITE_API_URL`: URL HTTPS de la API AWS, por ejemplo el endpoint HTTP API del stage. Vacía en desarrollo usa `/api` y Vite lo proxya a `http://localhost:3001`.
+- `VITE_API_URL`: URL HTTPS pública de API Gateway, `https://ep40dq915l.execute-api.us-east-1.amazonaws.com`. Si no se define en producción, se usa esa URL; en desarrollo sin valor usa `/api` y Vite la proxya a `http://localhost:3001`.
 - `VITE_AUTH_MODE`: `local` para desarrollo, `cognito` para autenticación alojada.
 - `VITE_COGNITO_CLIENT_ID`: ID público del app client de Cognito sin secreto.
 - `VITE_COGNITO_DOMAIN`: dominio HTTPS de Hosted UI.
 - `VITE_COGNITO_REDIRECT_URI`: URL de callback registrada en Cognito, normalmente `https://<sitio>/auth/callback`.
 
-Las variables `VITE_*` se incorporan al bundle y son visibles para cualquier visitante. Nunca pongas claves privadas, client secrets, tokens ni credenciales cloud en ellas. Registra también callback y logout URLs exactas en Cognito, solo si AWS Academy permite usarlo.
+Para el proyecto Pages de producción define `VITE_API_URL`, `VITE_AUTH_MODE=cognito`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_REDIRECT_URI=https://arquifusion-corp.pages.dev/auth/callback` en **Settings → Variables and Secrets → Variables de entorno** y vuelve a ejecutar el build después de guardarlas. El ID de cliente y el dominio Hosted UI son configuración pública; las claves privadas y secretos no son variables `VITE_*`. Registra también las URL de callback y logout exactas en Cognito.
 
 
 ## Cierre de sesión Cognito

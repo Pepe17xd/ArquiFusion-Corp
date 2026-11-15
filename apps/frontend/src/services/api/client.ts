@@ -71,7 +71,7 @@ export interface OperationsOverview {
 
 import { accessToken, authMode, selectedTenantId, expireSession, type TenantChoice } from "../auth/session";
 
-const apiBase = (import.meta.env.VITE_API_URL || "/api").replace(/\/$/, "");
+const apiBase = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api" : "https://ep40dq915l.execute-api.us-east-1.amazonaws.com")).replace(/\/$/, "");
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
@@ -107,7 +107,8 @@ export const fleetApi = {
   machines: (query: URLSearchParams) => request<MachinePage>("/machines?" + query.toString()),
   machine: (id: string) => request<Machine>("/machines/" + encodeURIComponent(id)),
   recommendations: () => request<RecommendationResult>("/intelligence/recommendations"),
-  submitRecommendationTask: (idempotencyKey: string) => request<{ task: AgentTask; created: boolean }>("/tasks", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ taskType: "fleet.recommendations", idempotencyKey }) }),
+  submitRecommendationTask: (idempotencyKey: string, correlationId: string) => request<{ task: AgentTask; created: boolean }>("/tasks", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify({ taskType: "fleet.recommendations", idempotencyKey, correlationId }) }),
+  tasks: () => request<AgentTask[]>("/tasks"),
   task: (taskId: string) => request<AgentTask>("/tasks/" + encodeURIComponent(taskId)),
   overview: () => request<OperationsOverview>("/operations/overview"),
   events: () => request<AgentEvent[]>("/events"),

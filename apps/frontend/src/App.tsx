@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
-import { fleetApi, apiSession, type AgentTask, type FleetMetrics, type Machine, type OperationsOverview, type RecommendationResult } from "./services/api/client";
+import { fleetApi, apiSession, type AgentEvent, type AgentTask, type FleetMetrics, type Machine, type OperationsOverview, type RecommendationResult } from "./services/api/client";
 import { type AppView } from "./components/navigation/NavigationRail";
 import { TopBar } from "./components/layout/TopBar";
 import { FeedbackBanner } from "./components/feedback/FeedbackBanner";
@@ -10,6 +10,7 @@ import { AgentCommand } from "./features/intelligence/AgentCommand";
 import { ActivityView } from "./features/operations/ActivityView";
 import { IngestionView } from "./features/ingestion/IngestionView";
 import { PlannedView } from "./features/planned/PlannedView";
+import { IntelligenceWorkbench } from "./features/intelligence/IntelligenceWorkbench";
 import { authMode, selectedTenantId, signOut } from "./services/auth/session";
 import "./style.css";
 import "./supervisor.css";
@@ -31,6 +32,10 @@ export default function App() {
   const [view, setView] = useState<AppView>(() => { const target = window.location.hash.slice(1); return ["fleet", "agents", "activity", "ingestion"].includes(target) ? target as AppView : "command"; });
   const [metrics, setMetrics] = useState<FleetMetrics | null>(null);
   const [overview, setOverview] = useState<OperationsOverview | null>(null);
+  const [tasks, setTasks] = useState<AgentTask[]>([]);
+  const [events, setEvents] = useState<AgentEvent[]>([]);
+  const [tasksError, setTasksError] = useState("");
+  const [eventsError, setEventsError] = useState("");
   const [machines, setMachines] = useState<Machine[]>([]);
   const [pageNumber, setPageNumber] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -52,6 +57,9 @@ export default function App() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [organization, setOrganization] = useState(authMode === "local" ? "Entorno local" : "Organización seleccionada");
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const [selectedMachineId, setSelectedMachineId] = useState("");
+  const taskInFlight = useRef(false);
+  const pendingSubmissionKey = useRef<string | null>(null);
   const [importing, setImporting] = useState(false);
   const [now, setNow] = useState(new Date());
   const [mobileMenu, setMobileMenu] = useState(false);
@@ -76,7 +84,7 @@ export default function App() {
       } while (cursor);
       return items;
     };
-    const [health, page, totals, operations] = await Promise.allSettled([fleetApi.health(), allMachines(), fleetApi.metrics(), fleetApi.overview()]);
+    const [health, page, totals, operations, taskList, eventList] = await Promise.allSettled([fleetApi.health(), allMachines(), fleetApi.metrics(), fleetApi.overview(), fleetApi.tasks(), fleetApi.events()]);
 
     if (version !== loadVersion.current) return;
     if (health.status === "fulfilled") setConnected(health.value.status === "ok");
@@ -89,6 +97,10 @@ export default function App() {
     else setMetrics(null);
     if (operations.status === "fulfilled") setOverview(operations.value);
     else setOverview(null);
+    if (taskList.status === "fulfilled") { setTasks(taskList.value); setTasksError(""); }
+    else setTasksError(taskList.reason instanceof Error ? taskList.reason.message : "No se pudieron consultar las tareas.");
+    if (eventList.status === "fulfilled") { setEvents(eventList.value); setEventsError(""); }
+    else setEventsError(eventList.reason instanceof Error ? eventList.reason.message : "No se pudieron consultar los eventos.");
     if (page.status === "fulfilled" || totals.status === "fulfilled") setLastUpdated(new Date());
 
     const failure = page.status === "rejected" ? page.reason : totals.status === "rejected" ? totals.reason : health.status === "rejected" ? health.reason : undefined;
@@ -100,25 +112,47 @@ export default function App() {
   useEffect(() => { if (authMode === "cognito") void apiSession.tenants().then(items => { const found = items.find(item => item.tenant.tenantId === selectedTenantId()); if (found) setOrganization(found.tenant.name); }).catch(() => undefined); }, []);
   useEffect(() => { const timer = window.setInterval(() => setNow(new Date()), 1000); return () => window.clearInterval(timer); }, []);
 
+  useEffect(() => { if (machines.length && !machines.some((machine) => machine.machineId === selectedMachineId)) setSelectedMachineId(machines[0].machineId); }, [machines, selectedMachineId]);
+
+  const refreshTask = useCallback(async () => {
+    if (!task?.taskId) return;
+    setIntelligenceError("");
+    try {
+      const updated = await fleetApi.task(task.taskId);
+      setTask(updated);
+      if (updated.result) setRecommendationResult(updated.result);
+      void load();
+    } catch (reason) {
+      setIntelligenceError(reason instanceof Error ? reason.message : "No se pudo consultar el estado de la tarea.");
+    }
+  }, [task?.taskId, load]);
+
   const runIntelligence = useCallback(async () => {
+    if (!selectedMachineId || taskInFlight.current || (task && !["SUCCEEDED", "FAILED", "DEAD_LETTER"].includes(task.state))) return;
+    taskInFlight.current = true;
     setIntelligenceLoading(true); setError(""); setIntelligenceError(""); setRecommendationResult(null); setTask(null);
     try {
-      const submitted = await fleetApi.submitRecommendationTask(`dashboard-${crypto.randomUUID()}`);
-      let task = submitted.task;
-      setTask(task);
-      for (let poll = 0; poll < 80 && !["SUCCEEDED", "FAILED", "DEAD_LETTER"].includes(task.state); poll += 1) {
-        await new Promise((resolve) => window.setTimeout(resolve, 150));
-        task = await fleetApi.task(task.taskId);
-        setTask(task);
+      const requestId = pendingSubmissionKey.current ?? crypto.randomUUID();
+      pendingSubmissionKey.current = requestId;
+      const submitted = await fleetApi.submitRecommendationTask(requestId, requestId);
+      pendingSubmissionKey.current = null;
+      let currentTask = submitted.task;
+      setTask(currentTask);
+      for (let poll = 0; poll < 65 && !["SUCCEEDED", "FAILED", "DEAD_LETTER"].includes(currentTask.state); poll += 1) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        currentTask = await fleetApi.task(currentTask.taskId);
+        setTask(currentTask);
       }
-      if (task.state !== "SUCCEEDED" || !task.result) throw new Error(task.error?.message || "La ejecución no terminó correctamente.");
-      setRecommendationResult(task.result);
-      void fleetApi.overview().then(setOverview).catch(() => undefined);
+      if (currentTask.result) setRecommendationResult(currentTask.result);
+      if (["FAILED", "DEAD_LETTER"].includes(currentTask.state)) setIntelligenceError(currentTask.error?.message || "La tarea terminó con error.");
+      void load();
+    } catch (reason) {
+      setIntelligenceError(reason instanceof Error ? reason.message : "No se pudo crear o consultar la tarea.");
+    } finally {
+      taskInFlight.current = false;
+      setIntelligenceLoading(false);
     }
-    catch (reason) { const message = reason instanceof Error ? reason.message : "No se pudo ejecutar Intelligence."; setIntelligenceError(message); setError(message); }
-    finally { setIntelligenceLoading(false); }
-  }, []);
-  useEffect(() => { void runIntelligence(); }, [runIntelligence]);
+  }, [selectedMachineId, task, load]);
 
   async function openMachine(id: string) {
     try { setSelectedMachine(await fleetApi.machine(id)); }
@@ -152,10 +186,10 @@ export default function App() {
       <main className="content-area">
         {(error || notice) && <FeedbackBanner kind={error ? "error" : "success"} onDismiss={() => { setError(""); setNotice(""); }}>{error || notice}</FeedbackBanner>}
         <div className="page-intro"><div><div className="eyebrow">ARQUIFUSION / OPERACIONES</div><h1>{headings[view][0]}</h1><p>{headings[view][1]}</p></div>{view !== "ingestion" && <span className="data-origin"><span className={`origin-led ${connected ? "online" : checking ? "checking" : "offline"}`}/>{connected ? "DATOS DE API" : checking ? "REVISANDO API" : "API SIN CONEXIÓN"}</span>}</div>
-        {view === "command" && <CommandCenter metrics={metrics} machines={machines} total={metrics?.total ?? 0} loading={loading} result={recommendationResult} intelligenceLoading={intelligenceLoading} intelligenceError={intelligenceError} overview={overview} task={task} connected={connected} checking={checking} lastUpdated={lastUpdated} organization={organization} onRun={runIntelligence} onNavigate={navigate} onOpenMachine={openMachine}/>}
+        {view === "command" && <CommandCenter metrics={metrics} machines={machines} total={metrics?.total ?? 0} loading={loading} intelligenceLoading={intelligenceLoading} intelligenceError={intelligenceError} overview={overview} task={task} tasks={tasks} events={events} tasksError={tasksError} eventsError={eventsError} selectedMachineId={selectedMachineId} onSelectMachine={setSelectedMachineId} connected={connected} checking={checking} lastUpdated={lastUpdated} organization={organization} onRun={runIntelligence} onRefreshTask={refreshTask} onNavigate={navigate} onOpenMachine={openMachine}/>}
         {view === "fleet" && <FleetView machines={machines} metrics={metrics} loading={loading} fleetError={fleetError} search={searchInput} setSearch={setSearchInput} onSearch={submitSearch} status={status} setStatus={(value) => { setPageNumber(1); setStatus(value); }} category={category} setCategory={(value) => { setPageNumber(1); setCategory(value); }} appliedSearch={search} pageNumber={pageNumber} pageSize={pageSize} setPageNumber={setPageNumber} setPageSize={(value) => { setPageNumber(1); setPageSize(value); }} onOpenMachine={openMachine}/>} 
-        {view === "agents" && <AgentCommand result={recommendationResult} loading={intelligenceLoading} onRun={runIntelligence} onOpenMachine={openMachine}/>} 
-        {view === "activity" && <ActivityView overview={overview}/>}
+        {view === "agents" && <AgentCommand result={recommendationResult} loading={intelligenceLoading} onRun={runIntelligence} onOpenMachine={openMachine} machines={machines} task={task} error={intelligenceError} selectedMachineId={selectedMachineId} onSelectMachine={setSelectedMachineId} onRefreshTask={refreshTask}/>}
+        {view === "activity" && <ActivityView events={events} error={eventsError} loading={loading}/>}
         {view === "ingestion" && <IngestionView importing={importing} onFile={ingest}/>}
         {["maintenance", "inventory", "technicians", "incidents"].includes(view) && <PlannedView view={view} description={headings[view][1]}/>}
         <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>PLATAFORMA DE OPERACIONES</span></footer>
