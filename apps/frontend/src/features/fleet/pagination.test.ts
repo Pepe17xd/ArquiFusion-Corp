@@ -1,0 +1,10 @@
+import { test } from "node:test";
+import { strict as assert } from "node:assert";
+import { paginate } from "./pagination.ts";
+
+test("pagination uses the filtered records and clamps page boundaries", () => {
+  const filtered = Array.from({ length: 23 }, (_, i) => i + 1).filter(n => n % 2 === 1);
+  assert.deepEqual(paginate(filtered, 2, 5), { items: [11, 13, 15, 17, 19], page: 2, pages: 3, total: 12 });
+  assert.deepEqual(paginate(filtered, 9, 10), { items: [21, 23], page: 2, pages: 2, total: 12 });
+  assert.deepEqual(paginate([], 3, 20), { items: [], page: 1, pages: 1, total: 0 });
+});

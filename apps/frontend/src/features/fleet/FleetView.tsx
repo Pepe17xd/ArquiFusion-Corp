@@ -1,23 +1,27 @@
-import type { FormEvent, SetStateAction } from "react";
+import type { FormEvent } from "react";
 import { ArrowLeft, ArrowRight, ChevronDown, X } from "lucide-react";
 import type { FleetMetrics, Machine, MachineStatus } from "../../services/api/client";
 import { FleetMetricsStrip } from "../../components/telemetry/FleetMetricsStrip";
+import { paginate } from "./pagination";
 import { MachineStatusBadge } from "../../components/ui/StatusBadge";
 
-export function FleetView({ machines, metrics, loading, search, setSearch, onSearch, status, setStatus, category, setCategory, cursorStack, nextCursor, setCursorStack, onOpenMachine }: {
-  machines: Machine[]; metrics: FleetMetrics | null; loading: boolean; search: string; setSearch: (value: string) => void;
+export function FleetView({ machines, metrics, loading, fleetError, search, setSearch, onSearch, status, setStatus, category, setCategory, appliedSearch, pageNumber, pageSize, setPageNumber, setPageSize, onOpenMachine }: {
+  machines: Machine[]; metrics: FleetMetrics | null; loading: boolean; fleetError: boolean; search: string; setSearch: (value: string) => void;
   onSearch: (event: FormEvent) => void; status: string; setStatus: (value: string) => void; category: string;
-  setCategory: (value: string) => void; cursorStack: string[]; nextCursor?: string;
-  setCursorStack: (value: SetStateAction<string[]>) => void; onOpenMachine: (id: string) => void;
+  setCategory: (value: string) => void; appliedSearch: string; pageNumber: number; pageSize: number;
+  setPageNumber: (value: number) => void; setPageSize: (value: number) => void; onOpenMachine: (id: string) => void;
 }) {
   const categories = Object.keys(metrics?.byCategory || {});
+  const query = appliedSearch.toLocaleLowerCase("es");
+  const filtered = machines.filter(machine => (!status || machine.status === status) && (!category || machine.category === category) && (!query || [machine.machineId, machine.model, machine.category, machine.location].some(value => value.toLocaleLowerCase("es").includes(query))));
+  const page = paginate(filtered, pageNumber, pageSize);
   return <>
     <FleetMetricsStrip metrics={metrics} loading={loading}/>
     <section className="panel fleet-table-panel">
       <div className="fleet-toolbar">
         <form className="search-form" onSubmit={onSearch}>
           <svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar ID, modelo o ubicación"/>
+          <input aria-label="Buscar por ID, modelo o ubicaci?n" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar ID, modelo o ubicación"/>
           <button type="submit">Buscar</button>
         </form>
         <div className="filters">
@@ -25,10 +29,10 @@ export function FleetView({ machines, metrics, loading, search, setSearch, onSea
           <label><span>Categoría</span><select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Todas las categorías</option>{categories.map((value) => <option key={value}>{value}</option>)}</select><ChevronDown size={13}/></label>
         </div>
       </div>
-      <MachineTable machines={machines} loading={loading} onOpen={onOpenMachine}/>
-      <div className="pagination"><span>Página {cursorStack.length + 1} · {machines.length} registros{metrics ? ` / ${metrics.total} en total` : ""}</span><div>
-        <button className="button button-secondary" disabled={!cursorStack.length || loading} onClick={() => setCursorStack((stack) => stack.slice(0, -1))}><ArrowLeft size={14}/> Anterior</button>
-        <button className="button button-secondary" disabled={!nextCursor || loading} onClick={() => nextCursor && setCursorStack((stack) => [...stack, nextCursor])}>Siguiente <ArrowRight size={14}/></button>
+      {fleetError && !loading ? <div className="table-message" role="alert">No se pudieron cargar los registros de flota. Actualiza para reintentar.</div> : <MachineTable machines={page.items} loading={loading} onOpen={onOpenMachine}/>}
+      <div className="pagination"><div><span>Paginaci?n del cliente ? {fleetError ? "Total no disponible" : `${page.total} registros coincidentes`} ? p?gina {page.page} de {page.pages} ? {page.items.length} visibles</span><label>Registros por p?gina <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[5, 10, 20].map(size => <option key={size} value={size}>{size}</option>)}</select></label></div><div>
+        <button className="button button-secondary" disabled={page.page <= 1 || loading} onClick={() => setPageNumber(page.page - 1)}><ArrowLeft size={14}/> Anterior</button>
+        <button className="button button-secondary" disabled={page.page >= page.pages || loading} onClick={() => setPageNumber(page.page + 1)}>Siguiente <ArrowRight size={14}/></button>
       </div></div>
     </section>
   </>;

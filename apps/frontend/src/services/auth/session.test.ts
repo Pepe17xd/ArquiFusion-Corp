@@ -97,12 +97,34 @@ test("PKCE login sends only the challenge and keeps state in session storage", a
   await client.beginLogin();
   const loginUrl = new URL(runtime.location.href);
   assert.equal(loginUrl.origin, domain);
+  assert.equal(loginUrl.pathname, "/oauth2/authorize");
   assert.equal(loginUrl.searchParams.get("response_type"), "code");
+  assert.equal(loginUrl.searchParams.get("client_id"), clientId);
+  assert.equal(loginUrl.searchParams.get("redirect_uri"), redirectUri);
+  assert.equal(loginUrl.searchParams.get("scope"), "openid email profile arquifusion/read arquifusion/write");
   assert.equal(loginUrl.searchParams.get("code_challenge_method"), "S256");
   assert.equal(loginUrl.searchParams.get("state"), storage.getItem("arquifusion.oauth-state"));
-  assert.ok(loginUrl.searchParams.get("code_challenge"));
+  assert.ok(loginUrl.searchParams.get("state"));
+  const verifier = storage.getItem("arquifusion.pkce-verifier");
+  assert.ok(verifier);
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  const expectedChallenge = btoa(String.fromCharCode(...new Uint8Array(digest))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  assert.equal(loginUrl.searchParams.get("code_challenge"), expectedChallenge);
   assert.equal(loginUrl.searchParams.has("code_verifier"), false);
-  assert.ok(storage.getItem("arquifusion.pkce-verifier"));
+  assert.equal(loginUrl.searchParams.has("screen_hint"), false);
+});
+
+test("signup starts at the authorization endpoint with the signup hint and PKCE", async () => {
+  const storage = new MemoryStorage();
+  const runtime = runtimeFor(storage);
+  await createSessionClient(runtime).beginLogin(true);
+  const url = new URL(runtime.location.href);
+  assert.equal(url.pathname, "/oauth2/authorize");
+  assert.equal(url.searchParams.get("screen_hint"), "signup");
+  assert.equal(url.searchParams.get("response_type"), "code");
+  assert.equal(url.searchParams.get("code_challenge_method"), "S256");
+  assert.equal(url.searchParams.get("state"), storage.getItem("arquifusion.oauth-state"));
+  assert.ok(url.searchParams.get("code_challenge"));
 });
 
 test("logout revokes the refresh token, clears local state, and ends the Cognito Hosted UI session", async () => {
@@ -120,11 +142,21 @@ test("logout revokes the refresh token, clears local state, and ends the Cognito
   assert.equal(logoutUrl.pathname, "/logout");
   assert.equal(logoutUrl.searchParams.get("client_id"), clientId);
   assert.equal(logoutUrl.searchParams.get("logout_uri"), origin);
+  assert.deepEqual([...logoutUrl.searchParams.keys()].sort(), ["client_id", "logout_uri"]);
   assert.equal(new URLSearchParams(revokeBody).get("token"), "value");
   assert.equal(new URLSearchParams(revokeBody).get("client_id"), clientId);
   assert.equal(storage.getItem("arquifusion.access-token"), null);
   assert.equal(storage.getItem("arquifusion.refresh-token"), null);
   assert.equal(storage.getItem("arquifusion.tenant-id"), null);
+});
+
+test("logout clears local state and redirects even when token revocation fails", async () => {
+  const storage = new MemoryStorage();
+  for (const key of ["arquifusion.access-token", "arquifusion.refresh-token", "arquifusion.tenant-id", "arquifusion.oauth-state", "arquifusion.pkce-verifier"]) storage.setItem(key, "value");
+  const runtime = runtimeFor(storage, async () => { throw new Error("network failure"); });
+  await createSessionClient(runtime).signOut();
+  assert.equal(new URL(runtime.location.href).pathname, "/logout");
+  for (const key of ["arquifusion.access-token", "arquifusion.refresh-token", "arquifusion.tenant-id", "arquifusion.oauth-state", "arquifusion.pkce-verifier"]) assert.equal(storage.getItem(key), null);
 });
 
 function runtimeFor(storage: MemoryStorage, fetcher: typeof fetch = async () => Response.json({})) {

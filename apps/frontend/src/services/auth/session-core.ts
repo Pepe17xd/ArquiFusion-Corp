@@ -111,7 +111,7 @@ export function createSessionClient(runtime: SessionRuntime) {
       try {
         await runtime.fetcher(`${runtime.domain}/oauth2/revoke`, {
           method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" },
-          body: new URLSearchParams({ token: refresh, client_id: runtime.clientId }),
+          body: new URLSearchParams({ token: refresh, client_id: runtime.clientId }), signal: AbortSignal.timeout(5000),
         });
       } catch { /* Local credentials are already cleared; still end the Hosted UI session. */ }
     }
