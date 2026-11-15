@@ -9,7 +9,6 @@ build:
     platform: node
     target: node24
     format: cjs
-    packages: bundle
 provider:
   name: aws
   runtime: nodejs24.x
