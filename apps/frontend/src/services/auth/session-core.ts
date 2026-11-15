@@ -78,7 +78,7 @@ export function createSessionClient(runtime: SessionRuntime) {
     runtime.storage.setItem(ACCESS_KEY, tokens.access_token);
     runtime.storage.setItem(REFRESH_KEY, tokens.refresh_token);
     runtime.storage.removeItem(VERIFIER_KEY); runtime.storage.removeItem(STATE_KEY);
-    runtime.history.replaceState({}, "", "/");
+    runtime.history.replaceState({}, "", "/app");
     return true;
   }
 

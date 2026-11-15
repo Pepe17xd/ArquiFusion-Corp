@@ -74,7 +74,7 @@ test("OAuth callback validates state and exchanges the code with the saved PKCE 
   assert.equal(client.hasSession(), true);
   assert.equal(storage.getItem("arquifusion.refresh-token"), "new-refresh");
   assert.equal(storage.getItem("arquifusion.pkce-verifier"), null);
-  assert.equal(runtime.location.href, `${origin}/`);
+  assert.equal(runtime.location.href, `${origin}/app`);
 });
 
 test("OAuth callback with a mismatched state is rejected and clears the session", async () => {
