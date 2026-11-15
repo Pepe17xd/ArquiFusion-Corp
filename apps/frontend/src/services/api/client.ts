@@ -42,7 +42,7 @@ export interface Recommendation {
 export interface RecommendationResult {
   generatedAt: string;
   recommendations: Recommendation[];
-  source: "deterministic-rules";
+  source: "deterministic-rules" | "gemini-api";
 }
 
 export interface MachinePage { items: Machine[]; nextCursor?: string }

@@ -12,8 +12,10 @@ export const TASK_CLAIM_LEASE_MS = 315_000;
 
 export class AgentSupervisor {
   private readonly activeExecutions = new Set<string>();
-  constructor(private readonly store: TaskStore, private readonly machines: MachineRepository, private readonly intelligence: IntelligenceProvider = new LangGraphFleetIntelligence(), private readonly retryDelay: (attempt: number) => Promise<void> = backoff, private readonly dispatcher?: TaskDispatcher) {}
-
+  constructor(private readonly store: TaskStore, private readonly machines: MachineRepository, private readonly intelligence: IntelligenceProvider = new LangGraphFleetIntelligence(), private readonly retryDelay: (attempt: number) => Promise<void> = backoff, private readonly dispatcher?: TaskDispatcher, private readonly notify?: (task: TaskRecord) => Promise<void>) {}
+  private async alert(task: TaskRecord) {
+    try { await this.notify?.(task); } catch { /* an alert failure must never change task state */ }
+  }
   agents() { return listAgents(); }
 
   async submit(input: { tenantId: string; taskType: unknown; idempotencyKey?: string; correlationId?: string }) {
@@ -52,7 +54,9 @@ export class AgentSupervisor {
     if (!task || isTerminalTaskState(task.state)) return task;
     // A late failure callback cannot overwrite a worker that still owns a live lease.
     if (task.claim && task.claim.leaseExpiresAt > Date.now()) return task;
-    return this.store.update({ ...task, state: "DEAD_LETTER", updatedAt: new Date().toISOString(), error: { code: "WORKFLOW_FAILURE", message: "El workflow durable termino sin completar la tarea.", retryable: false } }, createEvent({ eventType: "AgentTaskFailed", tenantId: task.tenantId, taskId: task.taskId, executionId: task.executionId, correlationId: task.correlationId, payload: { code: "WORKFLOW_FAILURE", state: "DEAD_LETTER" } }));
+    const updated = await this.store.update({ ...task, state: "DEAD_LETTER", updatedAt: new Date().toISOString(), error: { code: "WORKFLOW_FAILURE", message: "El workflow durable termino sin completar la tarea.", retryable: false } }, createEvent({ eventType: "AgentTaskFailed", tenantId: task.tenantId, taskId: task.taskId, executionId: task.executionId, correlationId: task.correlationId, payload: { code: "WORKFLOW_FAILURE", state: "DEAD_LETTER" } }));
+    await this.alert(updated);
+    return updated;
   }
 
   private async execute(tenantId: string, taskId: string, workerId: string) {
@@ -84,7 +88,10 @@ export class AgentSupervisor {
       let result: Awaited<ReturnType<IntelligenceProvider["recommend"]>>;
       try {
         if (task.taskType !== "fleet.recommendations" || task.agentId !== "fleet-intelligence") throw new PermanentTaskError("CAPABILITY_DENIED", "El agente no tiene capacidad autorizada para esta tarea.");
-        result = await this.intelligence.recommend({ machines: await collectAllMachines(this.machines, task.tenantId) });
+        result = await this.intelligence.recommend({
+          machines: await collectAllMachines(this.machines, task.tenantId),
+          context: { tenantId: task.tenantId, taskId, executionId: task.executionId, correlationId: task.correlationId },
+        });
       } catch (error) {
         const permanent = error instanceof PermanentTaskError;
         const message = safeErrorMessage(error);
@@ -92,7 +99,7 @@ export class AgentSupervisor {
         const state: TaskRecord["state"] = exhausted ? (permanent ? "FAILED" : "DEAD_LETTER") : "RETRYING";
         const failure = { code: error instanceof PermanentTaskError ? error.code : "PROVIDER_FAILURE", message, retryable: !permanent };
         task = await this.store.update({ ...task, state, updatedAt: new Date().toISOString(), error: failure }, createEvent({ eventType: "AgentTaskFailed", tenantId: task.tenantId, taskId, executionId: task.executionId, correlationId: task.correlationId, payload: { attempt: task.attempts, code: failure.code, retryable: failure.retryable, state } }));
-        if (exhausted) return;
+        if (exhausted) { await this.alert(task); return; }
         await this.retryDelay(task.attempts);
         continue;
       }
