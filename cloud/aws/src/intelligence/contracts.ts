@@ -10,8 +10,9 @@ export interface Recommendation {
   evidence: Record<string, string | number>;
 }
 
-export interface IntelligenceInput { machines: Machine[] }
-export interface IntelligenceOutput { generatedAt: string; recommendations: Recommendation[]; source: "deterministic-rules" }
+export interface IntelligenceContext { tenantId: string; taskId: string; executionId: string; correlationId: string }
+export interface IntelligenceInput { machines: Machine[]; context?: IntelligenceContext }
+export interface IntelligenceOutput { generatedAt: string; recommendations: Recommendation[]; source: "deterministic-rules" | "gemini-api" }
 export interface IntelligenceProvider {
   recommend(input: IntelligenceInput): Promise<IntelligenceOutput>;
 }

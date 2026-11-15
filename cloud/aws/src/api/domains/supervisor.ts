@@ -1,6 +1,6 @@
 import type { APIGatewayProxyEventV2, Context } from "aws-lambda";
 import { randomUUID } from "node:crypto";
-import { LangGraphFleetIntelligence } from "../../intelligence/fleet-graph";
+import { createIntelligenceProvider } from "../../intelligence/factory";
 import { AgentSupervisor } from "../../supervisor/supervisor";
 import { createSupervisorHandlers } from "../handlers/supervisor";
 import { createDomainRuntime } from "./runtime";
@@ -12,7 +12,7 @@ function createHandlers() {
   const tasks = runtime.tasks();
   const dispatcher = runtime.dispatcher();
   if (!tasks || !dispatcher) throw new Error("Supervisor cloud runtime requires task storage and Step Functions");
-  const supervisor = new AgentSupervisor(tasks, machines, new LangGraphFleetIntelligence(), undefined, dispatcher);
+  const supervisor = new AgentSupervisor(tasks, machines, createIntelligenceProvider(), undefined, dispatcher);
   return createSupervisorHandlers(supervisor, machines, tasks, runtime.auth);
 }
 function getHandlers() { return handlers ??= createHandlers(); }

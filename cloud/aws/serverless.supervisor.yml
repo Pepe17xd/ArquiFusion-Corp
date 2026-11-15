@@ -11,6 +11,8 @@ provider:
   httpApi:
     id: ${env:HTTP_API_ID}
   environment:
+    INTELLIGENCE_SERVICE_URL: ${env:INTELLIGENCE_SERVICE_URL, ''}
+    INTELLIGENCE_API_KEY: ${env:INTELLIGENCE_API_KEY, ''}
     STORAGE_MODE: cloud
     AUTH_MODE: cognito
     MACHINES_TABLE: ${env:MACHINES_TABLE}

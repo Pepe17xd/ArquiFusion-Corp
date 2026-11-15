@@ -84,7 +84,10 @@ export class AgentSupervisor {
       let result: Awaited<ReturnType<IntelligenceProvider["recommend"]>>;
       try {
         if (task.taskType !== "fleet.recommendations" || task.agentId !== "fleet-intelligence") throw new PermanentTaskError("CAPABILITY_DENIED", "El agente no tiene capacidad autorizada para esta tarea.");
-        result = await this.intelligence.recommend({ machines: await collectAllMachines(this.machines, task.tenantId) });
+        result = await this.intelligence.recommend({
+          machines: await collectAllMachines(this.machines, task.tenantId),
+          context: { tenantId: task.tenantId, taskId, executionId: task.executionId, correlationId: task.correlationId },
+        });
       } catch (error) {
         const permanent = error instanceof PermanentTaskError;
         const message = safeErrorMessage(error);
