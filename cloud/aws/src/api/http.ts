@@ -5,6 +5,7 @@ import { AuthenticationError, TenantAccessError, TenantConflictError } from "../
 import { TaskDispatchError } from "../supervisor/contracts";
 import { randomUUID } from "node:crypto";
 import { OperationalConflictError, OperationalWorkflowDispatchError } from "../operations/contracts";
+import { AuraConflictError, AuraDispatchError, AuraDuplicateError, AuraStockError } from "../aura/contracts";
 
 export function jsonResponse(statusCode: number, data: unknown, headers: Record<string, string> = {}): APIGatewayProxyResultV2 {
   return {
@@ -53,6 +54,9 @@ export async function handleRequest(
     else if (error instanceof TaskDispatchError) { status = 503; body = { error: error.message }; }
     else if (error instanceof OperationalConflictError) { status = 409; body = { error: error.message }; }
     else if (error instanceof OperationalWorkflowDispatchError) { status = 503; body = { error: error.message }; }
+    else if (error instanceof AuraConflictError || error instanceof AuraDuplicateError) { status = 409; body = { error: error.message }; }
+    else if (error instanceof AuraStockError) { status = 409; body = { error: error.message }; }
+    else if (error instanceof AuraDispatchError) { status = 503; body = { error: error.message }; }
     const log = { requestId, correlationId, operation, tenantId: telemetry.tenantId, status, durationMs: Math.round(performance.now() - startedAt), errorName: error instanceof Error ? error.name : "UnknownError" };
     if (status === 401 || status === 403) console.warn(JSON.stringify({ event: "security.authorization.rejected", ...log }));
     else console.error(JSON.stringify({ event: "api.request.failed", ...log }));

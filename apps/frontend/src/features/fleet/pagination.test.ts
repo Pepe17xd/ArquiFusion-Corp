@@ -10,7 +10,7 @@ test("pagination uses the filtered records and clamps page boundaries", () => {
   assert.deepEqual(paginate([], 3, 20), { items: [], page: 1, pages: 1, total: 0 });
 });
 
-test("critical pagination and planned-module copy is valid UTF-8", () => {
+test("critical pagination and operational module copy is valid UTF-8", () => {
   const readUtf8 = (path: string) => new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(new URL(path, import.meta.url)));
   const fleet = readUtf8("./FleetView.tsx");
   assert.match(fleet, /Paginación del cliente ·/u);
@@ -21,5 +21,5 @@ test("critical pagination and planned-module copy is valid UTF-8", () => {
   const app = readUtf8("../../App.tsx");
   assert.match(planned, /Asignación de técnicos/u);
   assert.match(planned, /Se incorporarán controles/u);
-  assert.match(app, /Módulo planificado · aún no hay/u);
+  assert.match(app, /OperationalModule/u);
 });

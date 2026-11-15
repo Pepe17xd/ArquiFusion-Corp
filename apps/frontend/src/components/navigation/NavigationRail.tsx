@@ -1,9 +1,9 @@
-import { Activity, Bot, Boxes, ClipboardList, Command, Cpu, Gauge, HardHat, LayoutDashboard, PackageSearch, Truck, UploadCloud, Wrench } from "lucide-react";
+import { Activity, Bot, ClipboardList, Command, Cpu, Gauge, HardHat, LayoutDashboard, PackageSearch, Truck, UploadCloud, Workflow, Wrench } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { BrandLockup } from "../brand/BrandMark";
 import { ConnectionBadge } from "../ui/StatusBadge";
 
-export type AppView = "command" | "fleet" | "agents" | "activity" | "ingestion" | "maintenance" | "inventory" | "technicians" | "incidents";
+export type AppView = "command" | "fleet" | "agents" | "activity" | "ingestion" | "maintenance" | "inventory" | "technicians" | "incidents" | "orchestration";
 interface NavItem { id: AppView; label: string; icon: LucideIcon; planned?: boolean }
 const liveItems: NavItem[] = [
   { id: "command", label: "Centro de mando", icon: LayoutDashboard },
@@ -17,6 +17,7 @@ const plannedItems: NavItem[] = [
   { id: "inventory", label: "Inventario", icon: PackageSearch, planned: true },
   { id: "technicians", label: "Técnicos", icon: HardHat, planned: true },
   { id: "incidents", label: "Incidentes", icon: ClipboardList, planned: true },
+  { id: "orchestration", label: "Orquestación", icon: Workflow, planned: true },
 ];
 
 export function NavigationRail({ view, onNavigate, connected, checking, fleetCount }: {

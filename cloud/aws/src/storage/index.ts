@@ -13,6 +13,8 @@ import { createCognitoAccessTokenVerifier } from "../security/cognito-token-veri
 import { DynamoOperationalRepository } from "../operations/dynamo-repository";
 import { LocalOperationalRepository } from "../operations/local-repository";
 import { StepFunctionsAnomalyDispatcher } from "../operations/step-functions-dispatcher";
+import { DynamoAuraRepository } from "../aura/dynamo-repository";
+import { StepFunctionsAuraDispatcher } from "../aura/step-functions-dispatcher";
 
 export function createMachineRepository(config: AppConfig): MachineRepository {
   return config.storageMode === "cloud" ? new DynamoMachineRepository(config.machinesTable!) : new LocalMachineRepository(config.localDataFile);
@@ -39,6 +41,13 @@ export function createOperationalRepository(config: AppConfig) {
 }
 export function createOperationalWorkflow(config: AppConfig) {
   return config.storageMode === "cloud" && config.operationsStateMachineArn ? new StepFunctionsAnomalyDispatcher(config.operationsStateMachineArn) : undefined;
+}
+export function createAuraRepository(config: AppConfig) {
+  if (config.storageMode !== "cloud" || !config.auraTable) throw new Error("AURA requires cloud storage and AURA_TABLE");
+  return new DynamoAuraRepository(config.auraTable);
+}
+export function createAuraWorkflow(config: AppConfig) {
+  return config.storageMode === "cloud" && config.auraStateMachineArn ? new StepFunctionsAuraDispatcher(config.auraStateMachineArn) : undefined;
 }
 
 export function createTokenVerifier(config: AppConfig) {

@@ -48,6 +48,13 @@ test("solver rejects ragged and non-normalized matrices", () => {
   assert.throws(() => solveHungarianAssignment([[0.1]], -0.1), /unmatchedCost/);
 });
 
+test("per-incident unassigned penalties preserve high-priority work when technicians are scarce", () => {
+  const result = solveHungarianAssignment([[0.4], [0.2]], [0.1, 0.6]);
+  assert.deepEqual(result.matches.map((match) => match.technicianIndex), [null, 0]);
+  assert.ok(Math.abs(result.totalCost - 0.3) < 1e-9);
+  assert.throws(() => solveHungarianAssignment([[0.2], [0.3]], [0.4]), /unmatchedCost/);
+});
+
 function greedyByIncidentOrder(costs: number[][]): number {
   const occupied = new Set<number>();
   let total = 0;

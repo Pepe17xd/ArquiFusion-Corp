@@ -1,6 +1,15 @@
 service: arquifusion-operations
 frameworkVersion: '4'
 package: {individually: true}
+build:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    platform: node
+    target: node24
+    format: cjs
+    packages: bundle
 provider:
   name: aws
   runtime: nodejs24.x
@@ -24,61 +33,61 @@ provider:
     INTELLIGENCE_TIMEOUT_MS: '25000'
 functions:
   telemetryBatch:
-    handler: dist/api/domains/operations.telemetryBatch
+    handler: src/api/domains/operations.telemetryBatch
     role: ${env:OPERATIONS_INGEST_ROLE_ARN}
     timeout: 30
     events: [{httpApi: {path: /telemetry/batch, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   telemetry:
-    handler: dist/api/domains/operations.telemetry
+    handler: src/api/domains/operations.telemetry
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /telemetry, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   latestTelemetry:
-    handler: dist/api/domains/operations.latestTelemetry
+    handler: src/api/domains/operations.latestTelemetry
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /telemetry/latest, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   anomalies:
-    handler: dist/api/domains/operations.anomalies
+    handler: src/api/domains/operations.anomalies
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /anomalies, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   getAnomaly:
-    handler: dist/api/domains/operations.getAnomaly
+    handler: src/api/domains/operations.getAnomaly
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: '/anomalies/{anomalyId}', method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   explainAnomaly:
-    handler: dist/api/domains/operations.explainAnomaly
+    handler: src/api/domains/operations.explainAnomaly
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     timeout: 120
     events: [{httpApi: {path: '/anomalies/{anomalyId}/explanation', method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   getAnomalyRules:
-    handler: dist/api/domains/operations.getAnomalyRules
+    handler: src/api/domains/operations.getAnomalyRules
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /anomaly-rules, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   putAnomalyRules:
-    handler: dist/api/domains/operations.putAnomalyRules
+    handler: src/api/domains/operations.putAnomalyRules
     role: ${env:OPERATIONS_ADMIN_ROLE_ARN}
     events: [{httpApi: {path: /anomaly-rules, method: PUT, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   incidents:
-    handler: dist/api/domains/operations.incidents
+    handler: src/api/domains/operations.incidents
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /incidents, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   updateIncident:
-    handler: dist/api/domains/operations.updateIncident
+    handler: src/api/domains/operations.updateIncident
     role: ${env:OPERATIONS_WRITE_ROLE_ARN}
     events: [{httpApi: {path: '/incidents/{incidentId}', method: PATCH, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   maintenanceOrders:
-    handler: dist/api/domains/operations.maintenanceOrders
+    handler: src/api/domains/operations.maintenanceOrders
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /maintenance/orders, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   updateMaintenanceOrder:
-    handler: dist/api/domains/operations.updateMaintenanceOrder
+    handler: src/api/domains/operations.updateMaintenanceOrder
     role: ${env:OPERATIONS_WRITE_ROLE_ARN}
     events: [{httpApi: {path: '/maintenance/orders/{workOrderId}', method: PATCH, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
   operationalEvents:
-    handler: dist/api/domains/operations.operationalEvents
+    handler: src/api/domains/operations.operationalEvents
     role: ${env:OPERATIONS_READ_ROLE_ARN}
     events: [{httpApi: {path: /operations/events, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
   processAnomaly:
-    handler: dist/api/domains/operations.processAnomaly
+    handler: src/api/domains/operations.processAnomaly
     role: ${env:OPERATIONS_WORKER_ROLE_ARN}
     timeout: 30
 resources:

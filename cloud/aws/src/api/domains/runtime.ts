@@ -1,5 +1,5 @@
 import { loadConfig, type RuntimeDomain } from "../../core/config";
-import { createMachineRepository, createOperationalRepository, createOriginalFileStore, createTaskDispatcher, createTaskStore, createTenantDirectory, createTokenVerifier } from "../../storage";
+import { createAuraRepository, createAuraWorkflow, createMachineRepository, createOperationalRepository, createOriginalFileStore, createTaskDispatcher, createTaskStore, createTenantDirectory, createTokenVerifier } from "../../storage";
 import { StepFunctionsAnomalyDispatcher } from "../../operations/step-functions-dispatcher";
 import { createRequestAuthorizer } from "../request-authorizer";
 
@@ -13,6 +13,8 @@ export function createDomainRuntime(domain: RuntimeDomain) {
     originals: () => createOriginalFileStore(config),
     tasks: () => createTaskStore(config),
     operations: () => createOperationalRepository(config),
+    aura: () => createAuraRepository(config),
+    auraWorkflow: () => createAuraWorkflow(config),
     operationsDispatcher: () => config.operationsStateMachineArn ? new StepFunctionsAnomalyDispatcher(config.operationsStateMachineArn) : undefined,
     dispatcher: () => createTaskDispatcher(config),
   };

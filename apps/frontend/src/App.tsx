@@ -2,19 +2,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { FormEvent } from "react";
 import { fleetApi, apiSession, type AgentEvent, type AgentTask, type FleetMetrics, type Machine, type OperationsOverview, type RecommendationResult } from "./services/api/client";
 import { type AppView } from "./components/navigation/NavigationRail";
+import { NavigationRail } from "./components/navigation/NavigationRail";
 import { TopBar } from "./components/layout/TopBar";
 import { FeedbackBanner } from "./components/feedback/FeedbackBanner";
 import { CommandCenter } from "./features/dashboard/CommandCenter";
 import { FleetView, MachineDialog } from "./features/fleet/FleetView";
 import { AgentCommand } from "./features/intelligence/AgentCommand";
 import { ActivityView } from "./features/operations/ActivityView";
+import { OperationalModule } from "./features/operations/OperationalModule";
 import { IngestionView } from "./features/ingestion/IngestionView";
-import { PlannedView } from "./features/planned/PlannedView";
 import { IntelligenceWorkbench } from "./features/intelligence/IntelligenceWorkbench";
 import { authMode, selectedTenantId, signOut } from "./services/auth/session";
 import "./style.css";
 import "./supervisor.css";
 import "./dashboard-redesign.css";
+import "./aura-premium.css";
 
 const headings: Record<AppView, [string, string]> = {
   command: ["Centro de mando", "Estado de la flota, señales actuales e inteligencia operacional en una sola vista."],
@@ -22,14 +24,15 @@ const headings: Record<AppView, [string, string]> = {
   agents: ["Centro de agentes", "Workflow operativo y roles planificados para la plataforma."],
   activity: ["Actividad del sistema", "Estado de la trazabilidad operacional."],
   ingestion: ["Ingesta de datos", "Normaliza registros de flota desde archivos de origen."],
-  maintenance: ["Mantenimiento predictivo", "Módulo planificado · aún no hay registros ni programas de mantenimiento."],
-  inventory: ["Inteligencia de inventario", "Módulo planificado · aún no hay datos de repuestos."],
-  technicians: ["Asignación de técnicos", "Módulo planificado · aún no hay registros de técnicos."],
-  incidents: ["Centro de incidentes", "Módulo planificado · la gestión de incidentes aún no está disponible."],
+  maintenance: ["Mantenimiento", "Órdenes y estados leídos desde Operations."],
+  inventory: ["Inventario", "Stock, reservas y alertas reportados por AURA."],
+  technicians: ["Técnicos", "Disponibilidad y especialidades registradas en AURA."],
+  incidents: ["Centro de incidentes", "Incidentes y respuesta según los registros disponibles."],
+  orchestration: ["Orquestación", "Asignaciones AURA, confirmaciones y eventos persistidos."],
 };
 
 export default function App() {
-  const [view, setView] = useState<AppView>(() => { const target = window.location.hash.slice(1); return ["fleet", "agents", "activity", "ingestion"].includes(target) ? target as AppView : "command"; });
+  const [view, setView] = useState<AppView>(() => { const target = window.location.hash.slice(1); return ["fleet", "agents", "activity", "ingestion", "maintenance", "inventory", "technicians", "incidents", "orchestration"].includes(target) ? target as AppView : "command"; });
   const [metrics, setMetrics] = useState<FleetMetrics | null>(null);
   const [overview, setOverview] = useState<OperationsOverview | null>(null);
   const [tasks, setTasks] = useState<AgentTask[]>([]);
@@ -181,6 +184,7 @@ export default function App() {
   }
 
   return <div className="app-frame">
+    <div className="rail-wrap"><NavigationRail view={view} onNavigate={navigate} connected={connected} checking={checking} fleetCount={metrics?.total ?? 0}/></div>
     <div className="main-column">
       <TopBar view={view} onNavigate={navigate} connected={connected} checking={checking} dateTime={now} onRefresh={() => void load()} refreshing={loading} mobileMenu={mobileMenu} onMenu={() => setMobileMenu((open) => !open)} organization={organization} onSignOut={authMode === "cognito" ? signOut : undefined}/>
       <main className="content-area">
@@ -191,7 +195,7 @@ export default function App() {
         {view === "agents" && <AgentCommand result={recommendationResult} loading={intelligenceLoading} onRun={runIntelligence} onOpenMachine={openMachine} machines={machines} task={task} error={intelligenceError} selectedMachineId={selectedMachineId} onSelectMachine={setSelectedMachineId} onRefreshTask={refreshTask}/>}
         {view === "activity" && <ActivityView events={events} error={eventsError} loading={loading}/>}
         {view === "ingestion" && <IngestionView importing={importing} onFile={ingest}/>}
-        {["maintenance", "inventory", "technicians", "incidents"].includes(view) && <PlannedView view={view} description={headings[view][1]}/>}
+        {["maintenance", "inventory", "technicians", "incidents", "orchestration"].includes(view) && <OperationalModule view={view} onNavigate={navigate}/>}
         <footer className="page-footer"><span>ARQUIFUSION <i/> INTELIGENCIA OPERACIONAL</span><span>PLATAFORMA DE OPERACIONES</span></footer>
       </main>
     </div>

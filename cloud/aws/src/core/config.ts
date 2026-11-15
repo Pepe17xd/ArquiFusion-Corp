@@ -13,13 +13,15 @@ export interface AppConfig {
   tasksTable?: string;
   operationsTable?: string;
   operationsStateMachineArn?: string;
+  auraTable?: string;
+  auraStateMachineArn?: string;
   taskStateMachineArn?: string;
   cognitoIssuer?: string;
   cognitoAudience?: string;
   webOrigin?: string;
 }
 
-export type RuntimeDomain = "all" | "platform" | "fleet" | "ingestion" | "intelligence" | "supervisor" | "operations";
+export type RuntimeDomain = "all" | "platform" | "fleet" | "ingestion" | "intelligence" | "supervisor" | "operations" | "aura";
 
 function isCognitoIssuer(value: string) {
   try {
@@ -48,6 +50,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, domain: Runtime
     intelligence: ["MACHINES_TABLE", "TENANTS_TABLE"],
     supervisor: ["MACHINES_TABLE", "TENANTS_TABLE", "TASKS_TABLE", "TASK_STATE_MACHINE_ARN"],
     operations: ["MACHINES_TABLE", "TENANTS_TABLE", "OPERATIONS_TABLE", "OPERATIONS_STATE_MACHINE_ARN"],
+    aura: ["MACHINES_TABLE", "TENANTS_TABLE", "OPERATIONS_TABLE", "AURA_TABLE", "AURA_STATE_MACHINE_ARN"],
   };
   if (storageMode === "cloud") {
     const missing = (requiredCloudValues[domain] ?? requiredCloudValues.all!).filter((key) => !env[key]);
@@ -75,6 +78,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env, domain: Runtime
     tasksTable: env.TASKS_TABLE,
     operationsTable: env.OPERATIONS_TABLE,
     operationsStateMachineArn: env.OPERATIONS_STATE_MACHINE_ARN,
+    auraTable: env.AURA_TABLE,
+    auraStateMachineArn: env.AURA_STATE_MACHINE_ARN,
     taskStateMachineArn: env.TASK_STATE_MACHINE_ARN,
     cognitoIssuer: env.COGNITO_ISSUER,
     cognitoAudience: env.COGNITO_AUDIENCE,

@@ -5,7 +5,7 @@ import type { AppView } from "../navigation/NavigationRail";
 import { headerScrollDecision } from "./header-scroll";
 
 const live: [AppView, string][] = [["command", "Centro de mando"], ["fleet", "Flota"], ["agents", "Centro de agentes"], ["activity", "Actividad del sistema"], ["ingestion", "Ingesta de datos"]];
-const planned: [AppView, string][] = [["maintenance", "Mantenimiento"], ["inventory", "Inventario"], ["technicians", "Técnicos"], ["incidents", "Incidentes"]];
+const planned: [AppView, string][] = [["maintenance", "Mantenimiento"], ["inventory", "Inventario"], ["technicians", "Técnicos"], ["incidents", "Incidentes"], ["orchestration", "Orquestación"]];
 
 export function TopBar({ view, onNavigate, connected, checking, dateTime, onRefresh, refreshing, mobileMenu, onMenu, organization, onSignOut }: {
   view: AppView; onNavigate: (view: AppView) => void; connected: boolean; checking: boolean; dateTime: Date; onRefresh: () => void; refreshing: boolean; mobileMenu: boolean; onMenu: () => void; organization: string; onSignOut?: () => void;

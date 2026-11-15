@@ -20,12 +20,14 @@ const TIE_BREAK_EPSILON = 1e-12;
 
 export function solveHungarianAssignment(
   costs: ReadonlyArray<ReadonlyArray<number | null>>,
-  unmatchedCost = 0.75,
+  unmatchedCost: number | ReadonlyArray<number> = 0.75,
 ): AssignmentResult {
-  if (!Number.isFinite(unmatchedCost) || unmatchedCost < 0 || unmatchedCost > 1) {
-    throw new RangeError("unmatchedCost must be a normalized number from 0 to 1");
-  }
   if (costs.length === 0) return { matches: [], totalCost: 0 };
+
+  const unmatchedCosts = typeof unmatchedCost === "number" ? costs.map(() => unmatchedCost) : [...unmatchedCost];
+  if (unmatchedCosts.length !== costs.length || unmatchedCosts.some((cost) => !Number.isFinite(cost) || cost < 0 || cost > 1)) {
+    throw new RangeError("unmatchedCost must provide one normalized number from 0 to 1 per incident");
+  }
 
   const technicianCount = costs[0]?.length ?? 0;
   for (const row of costs) {
@@ -39,18 +41,18 @@ export function solveHungarianAssignment(
 
   const incidentCount = costs.length;
   const columnCount = technicianCount + incidentCount;
-  const matrix = costs.map((row) => [
+  const matrix = costs.map((row, rowIndex) => [
     ...row.map((cost) => cost === null ? FORBIDDEN_COST : cost + TIE_BREAK_EPSILON),
-    ...Array<number>(incidentCount).fill(unmatchedCost),
+    ...Array<number>(incidentCount).fill(unmatchedCosts[rowIndex]),
   ]);
   const columnForRow = hungarian(matrix);
 
   const matches = columnForRow.map((column, incidentIndex): AssignmentMatch => {
     const cost = costs[incidentIndex][column];
-    if (column < technicianCount && cost !== null && cost < unmatchedCost) {
+    if (column < technicianCount && cost !== null && cost < unmatchedCosts[incidentIndex]) {
       return { incidentIndex, technicianIndex: column, cost };
     }
-    return { incidentIndex, technicianIndex: null, cost: unmatchedCost };
+    return { incidentIndex, technicianIndex: null, cost: unmatchedCosts[incidentIndex] };
   });
   return { matches, totalCost: matches.reduce((sum, match) => sum + match.cost, 0) };
 

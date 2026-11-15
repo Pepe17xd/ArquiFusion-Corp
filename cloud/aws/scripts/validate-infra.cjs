@@ -6,7 +6,7 @@ const YAML = require("yaml");
 const root = __dirname + "/..";
 const read = (name) => YAML.parse(readFileSync(join(root, name), "utf8"));
 const platform = read("serverless.yml");
-const domains = ["fleet", "ingestion", "intelligence", "supervisor", "operations"].map((domain) => read(`serverless.${domain}.yml`));
+const domains = ["fleet", "ingestion", "intelligence", "supervisor", "operations", "aura"].map((domain) => read(`serverless.${domain}.yml`));
 const all = [platform, ...domains];
 assert.equal(platform.service, "arquifusion-platform");
 assert.equal(platform.provider?.name, "aws");
@@ -37,6 +37,7 @@ const expectedServices = new Map([
   ["arquifusion-intelligence", ["intelligence", "agents"]],
   ["arquifusion-supervisor", ["submitTask", "tasks", "getTask", "taskEvents", "operationsOverview", "runTask", "markTaskDeadLetter"]],
   ["arquifusion-operations", ["telemetryBatch", "telemetry", "latestTelemetry", "anomalies", "getAnomaly", "explainAnomaly", "getAnomalyRules", "putAnomalyRules", "incidents", "updateIncident", "maintenanceOrders", "updateMaintenanceOrder", "operationalEvents", "processAnomaly"]],
+  ["arquifusion-aura", ["technicians", "saveTechnician", "getTechnician", "archiveTechnician", "putMachineCoordinates", "parts", "createPart", "stock", "inventoryAlerts", "movements", "createMovement", "reserve", "releaseReservation", "optimize", "assignments", "assignment", "assignmentResponse", "policy", "savePolicy", "kpis", "events", "workflowCapture", "workflowNext", "workflowAccept", "workflowClose", "workflowFail"]],
 ]);
 const routes = new Set();
 let functionCount = 0;
@@ -51,9 +52,14 @@ for (const service of all) {
   for (const [name, definition] of functions) {
     assert.equal(typeof definition.handler, "string", `${name} handler is required`);
     const [modulePath, exportName] = definition.handler.split(".");
-    assert.ok(modulePath.startsWith("dist/api/domains/"), `${name} must use a compiled domain entrypoint`);
-    assert.ok(existsSync(join(root, modulePath + ".js")), `${name} compiled handler must exist after backend build`);
-    assert.ok(existsSync(join(root, modulePath.replace(/^dist\//, "src/") + ".ts")), `${name} must have a domain-owned TypeScript entrypoint`);
+    if (modulePath.startsWith("src/api/domains/")) {
+      assert.ok(existsSync(join(root, modulePath + ".ts")), `${name} source TypeScript handler must exist for Serverless v4 bundling`);
+      assert.equal(service.build?.esbuild?.bundle, true, `${name} source handler must be bundled by Serverless v4`);
+    } else {
+      assert.ok(modulePath.startsWith("dist/api/domains/"), `${name} must use a compiled domain entrypoint`);
+      assert.ok(existsSync(join(root, modulePath + ".js")), `${name} compiled handler must exist after backend build`);
+      assert.ok(existsSync(join(root, modulePath.replace(/^dist\//, "src/") + ".ts")), `${name} must have a domain-owned TypeScript entrypoint`);
+    }
     assert.ok(exportName, `${name} handler export must be named`);
     assert.ok(definition.role || service.provider?.iam?.role, `${name} must use an explicit existing runtime role`);
     for (const event of definition.events ?? []) {
@@ -70,8 +76,8 @@ for (const service of all) {
     }
   }
 }
-assert.equal(functionCount, 31);
-assert.equal(routes.size, 28);
+assert.equal(functionCount, 57);
+assert.equal(routes.size, 49);
 
 const foundation = platform.resources.Resources;
 assert.equal(foundation.LegacyMachinesTable?.DeletionPolicy, "Retain");
@@ -99,7 +105,7 @@ assert.ok(states.EjecutarWorkflow.Retry?.length);
 assert.equal(states.EjecutarWorkflow.Catch?.[0]?.Next, "RegistrarFalloDurable");
 assert.equal(states.RegistrarFalloDurable.Next, "EjecucionFallida");
 assert.equal(states.EjecucionFallida.Type, "Fail");
-assert.ok(domains.filter((service) => service.service !== "arquifusion-supervisor" && service.service !== "arquifusion-operations").every((service) => Object.values(service.resources?.Resources ?? {}).every((resource) => resource.Type !== "AWS::StepFunctions::StateMachine")), "only the Supervisor and operations domain own their separate workflow resources");
+assert.ok(domains.filter((service) => !["arquifusion-supervisor", "arquifusion-operations", "arquifusion-aura"].includes(service.service)).every((service) => Object.values(service.resources?.Resources ?? {}).every((resource) => resource.Type !== "AWS::StepFunctions::StateMachine")), "only the Supervisor, Operations and AURA domains own their separate workflow resources");
 const operations = domains.find((service) => service.service === "arquifusion-operations");
 const operationalTable = operations.resources.Resources.OperationalRecordsTable;
 assert.equal(operationalTable?.Type, "AWS::DynamoDB::Table");
@@ -113,6 +119,23 @@ assert.equal(anomalyWorkflow?.Type, "AWS::StepFunctions::StateMachine");
 assert.equal(anomalyWorkflow?.Properties?.StateMachineType, "STANDARD");
 assert.ok(anomalyWorkflow?.Properties?.Definition?.States?.ProcessAnomaly?.Retry?.length);
 assert.ok(Object.values(operations.functions).filter((fn) => fn.events?.length).every((fn) => fn.role), "operational routes require dedicated pre-existing role ARNs");
+
+const aura = domains.find((service) => service.service === "arquifusion-aura");
+const auraTable = aura.resources.Resources.AuraTable;
+assert.equal(auraTable?.Type, "AWS::DynamoDB::Table");
+assert.equal(auraTable?.DeletionPolicy, "Retain");
+assert.equal(auraTable?.UpdateReplacePolicy, "Retain");
+assert.deepEqual(auraTable?.Properties?.GlobalSecondaryIndexes?.map((index) => index.IndexName), ["ByTenantType"]);
+assert.equal(auraTable?.Properties?.TimeToLiveSpecification?.AttributeName, "expiresAt");
+const coordination = aura.resources.Resources.IncidentCoordinationStateMachine;
+assert.equal(coordination?.Properties?.StateMachineType, "STANDARD");
+assert.equal(coordination?.Properties?.Definition?.States?.CaptureConfirmation?.TimeoutSeconds, 43200);
+assert.equal(coordination?.Properties?.Definition?.States?.CaptureIntervention?.TimeoutSeconds, 86400);
+assert.ok(coordination?.Properties?.Definition?.States?.FindNextCandidate?.Retry?.length);
+assert.equal(coordination?.Properties?.Definition?.States?.FindNextCandidate?.Parameters?.["expectedAttempt.$"], "$.attempt");
+assert.equal(coordination?.Properties?.Definition?.States?.CaptureIntervention?.Catch?.[0]?.Next, "WorkflowFailure");
+assert.ok(Object.values(aura.functions).filter((fn) => fn.events?.length).every((fn) => fn.role), "AURA routes require explicit pre-existing role ARNs");
+assert.ok(aura.functions.assignmentResponse.role.includes("AURA_CALLBACK_ROLE_ARN"), "callback permissions must be isolated to assignment response functions");
 
 const cognito = read("infrastructure/cognito.yml");
 assert.equal(cognito.Resources.ArquiFusionUserPool.Properties.DeletionProtection, "ACTIVE");
@@ -130,4 +153,18 @@ const requestSchema = contract.paths["/v1/intelligence/analyze"].post.requestBod
 assert.ok(requestSchema, "intelligence endpoint must use a shared JSON schema");
 assert.ok(existsSync(join(require("node:path").dirname(contractPath), requestSchema)), "OpenAPI request schema reference must resolve from the contract file");
 
-process.stdout.write("Static checks passed: 6 Serverless stacks, 31 functions, 28 unique routes, retained tenant and operations tables, external least-privilege role references, JWT routes, separate Supervisor and operations Standard workflows and versioned contracts. This is not CloudFormation validation; no AWS call or deployment was made.\n");
+const auraContract = YAML.parse(readFileSync(join(root, "../../packages/contracts/openapi/aura.v1.yaml"), "utf8"));
+assert.equal(auraContract.openapi, "3.1.0");
+assert.ok(auraContract.paths?.["/assignments/optimize"]?.post, "AURA optimization contract must exist");
+assert.ok(auraContract.paths?.["/assignments/{assignmentId}/response"]?.post, "AURA human callback response must exist");
+assert.ok(auraContract.paths?.["/inventory/alerts"]?.get, "AURA inventory alert contract must exist");
+for (const [name, definition] of Object.entries(aura.functions)) {
+  for (const event of definition.events ?? []) {
+    const route = event.httpApi;
+    assert.ok(auraContract.paths?.[route.path]?.[route.method.toLowerCase()], `AURA route ${route.method} ${route.path} must exist in OpenAPI`);
+  }
+}
+assert.equal(auraContract.components?.schemas?.Technician?.additionalProperties, false, "AURA technician payload must reject arbitrary tenant fields");
+assert.ok(!JSON.stringify(auraContract).includes("taskToken"), "AURA OpenAPI must not expose callback task tokens");
+
+process.stdout.write("Static checks passed: 7 Serverless stacks, 57 functions, 49 unique routes, retained tenant/operations/AURA tables, external least-privilege role references, JWT routes, separate Supervisor/Operations/AURA Standard workflows and versioned contracts. This is not CloudFormation validation; no AWS call or deployment was made.\n");

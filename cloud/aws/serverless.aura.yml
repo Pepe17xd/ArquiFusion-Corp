@@ -1,0 +1,237 @@
+service: arquifusion-aura
+frameworkVersion: '4'
+package: {individually: true}
+build:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+    platform: node
+    target: node24
+    format: cjs
+    packages: bundle
+provider:
+  name: aws
+  runtime: nodejs24.x
+  region: ${opt:region, 'us-east-1'}
+  stage: ${opt:stage, 'dev'}
+  iam:
+    role: ${env:AURA_READ_ROLE_ARN}
+  httpApi:
+    id: ${env:HTTP_API_ID}
+  environment:
+    STORAGE_MODE: cloud
+    AUTH_MODE: cognito
+    MACHINES_TABLE: ${env:MACHINES_TABLE}
+    TENANTS_TABLE: ${env:TENANTS_TABLE}
+    OPERATIONS_TABLE: ${env:OPERATIONS_TABLE}
+    AURA_TABLE: ${env:AURA_TABLE, 'arquifusion-aura-${sls:stage}'}
+    AURA_STATE_MACHINE_ARN: arn:aws:states:${aws:region}:${env:AWS_ACCOUNT_ID}:stateMachine:arquifusion-aura-${sls:stage}-incident-coordination
+    COGNITO_ISSUER: ${env:COGNITO_ISSUER}
+    COGNITO_AUDIENCE: ${env:COGNITO_AUDIENCE}
+    WEB_ORIGIN: ${env:WEB_ORIGIN}
+functions:
+  technicians:
+    handler: src/api/domains/aura.technicians
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /technicians, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  saveTechnician:
+    handler: src/api/domains/aura.saveTechnician
+    role: ${env:AURA_WRITE_ROLE_ARN}
+    events: [{httpApi: {path: /technicians, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  getTechnician:
+    handler: src/api/domains/aura.getTechnician
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: '/technicians/{technicianId}', method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  archiveTechnician:
+    handler: src/api/domains/aura.archiveTechnician
+    role: ${env:AURA_ADMIN_ROLE_ARN}
+    events: [{httpApi: {path: '/technicians/{technicianId}', method: PATCH, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  putMachineCoordinates:
+    handler: src/api/domains/aura.putMachineCoordinates
+    role: ${env:AURA_ADMIN_ROLE_ARN}
+    events: [{httpApi: {path: '/machines/{machineId}/coordinates', method: PUT, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  parts:
+    handler: src/api/domains/aura.parts
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /inventory/parts, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  createPart:
+    handler: src/api/domains/aura.createPart
+    role: ${env:AURA_ADMIN_ROLE_ARN}
+    events: [{httpApi: {path: /inventory/parts, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  stock:
+    handler: src/api/domains/aura.stock
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /inventory/stock, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  inventoryAlerts:
+    handler: src/api/domains/aura.inventoryAlerts
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /inventory/alerts, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  movements:
+    handler: src/api/domains/aura.movements
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /inventory/movements, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  createMovement:
+    handler: src/api/domains/aura.createMovement
+    role: ${env:AURA_WRITE_ROLE_ARN}
+    events: [{httpApi: {path: /inventory/movements, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  reserve:
+    handler: src/api/domains/aura.reserve
+    role: ${env:AURA_WRITE_ROLE_ARN}
+    events: [{httpApi: {path: '/maintenance/orders/{workOrderId}/reservations', method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  releaseReservation:
+    handler: src/api/domains/aura.releaseReservation
+    role: ${env:AURA_WRITE_ROLE_ARN}
+    events: [{httpApi: {path: '/inventory/reservations/{reservationId}/release', method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  optimize:
+    handler: src/api/domains/aura.optimize
+    role: ${env:AURA_WRITE_ROLE_ARN}
+    events: [{httpApi: {path: /assignments/optimize, method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  assignments:
+    handler: src/api/domains/aura.assignments
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /assignments, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  assignment:
+    handler: src/api/domains/aura.assignment
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: '/assignments/{assignmentId}', method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  assignmentResponse:
+    handler: src/api/domains/aura.assignmentResponse
+    role: ${env:AURA_CALLBACK_ROLE_ARN}
+    events: [{httpApi: {path: '/assignments/{assignmentId}/response', method: POST, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  policy:
+    handler: src/api/domains/aura.policy
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /assignments/policy, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  savePolicy:
+    handler: src/api/domains/aura.savePolicy
+    role: ${env:AURA_ADMIN_ROLE_ARN}
+    events: [{httpApi: {path: /assignments/policy, method: PUT, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/write]}}}]
+  kpis:
+    handler: src/api/domains/aura.kpis
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /operations/kpis, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  events:
+    handler: src/api/domains/aura.events
+    role: ${env:AURA_READ_ROLE_ARN}
+    events: [{httpApi: {path: /aura/events, method: GET, authorizer: {id: '${env:HTTP_API_AUTHORIZER_ID}', scopes: [arquifusion/read]}}}]
+  workflowCapture:
+    handler: src/api/domains/aura.workflowCapture
+    role: ${env:AURA_WORKFLOW_ROLE_ARN}
+    timeout: 20
+  workflowNext:
+    handler: src/api/domains/aura.workflowNext
+    role: ${env:AURA_WORKFLOW_ROLE_ARN}
+    timeout: 30
+  workflowAccept:
+    handler: src/api/domains/aura.workflowAccept
+    role: ${env:AURA_WORKFLOW_ROLE_ARN}
+    timeout: 30
+  workflowClose:
+    handler: src/api/domains/aura.workflowClose
+    role: ${env:AURA_WORKFLOW_ROLE_ARN}
+    timeout: 30
+  workflowFail:
+    handler: src/api/domains/aura.workflowFail
+    role: ${env:AURA_WORKFLOW_ROLE_ARN}
+    timeout: 30
+resources:
+  Resources:
+    AuraTable:
+      Type: AWS::DynamoDB::Table
+      DeletionPolicy: Retain
+      UpdateReplacePolicy: Retain
+      Properties:
+        TableName: ${env:AURA_TABLE, 'arquifusion-aura-${sls:stage}'}
+        BillingMode: PAY_PER_REQUEST
+        AttributeDefinitions:
+          - {AttributeName: pk, AttributeType: S}
+          - {AttributeName: sk, AttributeType: S}
+          - {AttributeName: gsi1pk, AttributeType: S}
+          - {AttributeName: gsi1sk, AttributeType: S}
+        KeySchema: [{AttributeName: pk, KeyType: HASH}, {AttributeName: sk, KeyType: RANGE}]
+        GlobalSecondaryIndexes:
+          - IndexName: ByTenantType
+            KeySchema: [{AttributeName: gsi1pk, KeyType: HASH}, {AttributeName: gsi1sk, KeyType: RANGE}]
+            Projection: {ProjectionType: ALL}
+        TimeToLiveSpecification: {AttributeName: expiresAt, Enabled: true}
+        PointInTimeRecoverySpecification: {PointInTimeRecoveryEnabled: true}
+    IncidentCoordinationStateMachine:
+      Type: AWS::StepFunctions::StateMachine
+      Properties:
+        StateMachineName: arquifusion-aura-${sls:stage}-incident-coordination
+        StateMachineType: STANDARD
+        RoleArn: ${env:AURA_STEP_FUNCTIONS_ROLE_ARN}
+        Definition:
+          StartAt: CaptureConfirmation
+          States:
+            CaptureConfirmation:
+              Type: Task
+              Resource: arn:aws:states:::lambda:invoke.waitForTaskToken
+              TimeoutSeconds: 43200
+              Parameters:
+                FunctionName: {Fn::GetAtt: [WorkflowCaptureLambdaFunction, Arn]}
+                Payload: {tenantId.$: '$.tenantId', assignmentId.$: '$.assignmentId', phase: confirmation, attempt.$: '$.attempt', taskToken.$: '$$.Task.Token', executionArn.$: '$$.Execution.Id'}
+              Retry: [{ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException], IntervalSeconds: 2, MaxAttempts: 3, BackoffRate: 2}]
+              ResultSelector: {decision.$: '$.Payload.decision', reason.$: '$.Payload.reason'}
+              ResultPath: $.confirmation
+              Catch: [{ErrorEquals: [States.Timeout], ResultPath: $.waitError, Next: FindNextCandidate}]
+              Next: ConfirmationDecision
+            ConfirmationDecision:
+              Type: Choice
+              Choices:
+                - {Variable: '$.confirmation.decision', StringEquals: accepted, Next: MarkAccepted}
+                - {Variable: '$.confirmation.decision', StringEquals: rejected, Next: FindNextCandidate}
+              Default: FindNextCandidate
+            FindNextCandidate:
+              Type: Task
+              Resource: {Fn::GetAtt: [WorkflowNextLambdaFunction, Arn]}
+              Parameters: {tenantId.$: '$.tenantId', assignmentId.$: '$.assignmentId', reason: CoordinationRetry, expectedAttempt.$: '$.attempt'}
+              Retry: [{ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException], IntervalSeconds: 2, MaxAttempts: 3, BackoffRate: 2}]
+              ResultPath: $.candidate
+              Next: CandidateAvailable
+            CandidateAvailable:
+              Type: Choice
+              Choices: [{Variable: '$.candidate.candidateFound', BooleanEquals: true, Next: PrepareNextCandidate}]
+              Default: CoordinationEnded
+            PrepareNextCandidate:
+              Type: Pass
+              Parameters: {tenantId.$: '$.tenantId', assignmentId.$: '$.assignmentId', attempt.$: '$.candidate.attempt'}
+              ResultPath: $
+              Next: CaptureConfirmation
+            MarkAccepted:
+              Type: Task
+              Resource: {Fn::GetAtt: [WorkflowAcceptLambdaFunction, Arn]}
+              Parameters: {tenantId.$: '$.tenantId', assignmentId.$: '$.assignmentId'}
+              Retry: [{ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException], IntervalSeconds: 2, MaxAttempts: 3, BackoffRate: 2}]
+              ResultPath: $.accepted
+              Next: CaptureIntervention
+            CaptureIntervention:
+              Type: Task
+              Resource: arn:aws:states:::lambda:invoke.waitForTaskToken
+              TimeoutSeconds: 86400
+              Parameters:
+                FunctionName: {Fn::GetAtt: [WorkflowCaptureLambdaFunction, Arn]}
+                Payload: {tenantId.$: '$.tenantId', assignmentId.$: '$.assignmentId', phase: intervention, attempt: 1, taskToken.$: '$$.Task.Token', executionArn.$: '$$.Execution.Id'}
+              Retry: [{ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException], IntervalSeconds: 2, MaxAttempts: 3, BackoffRate: 2}]
+              ResultSelector: {occurredAt.$: '$.Payload.occurredAt', notes.$: '$.Payload.notes'}
+              ResultPath: $.intervention
+              Catch: [{ErrorEquals: [States.Timeout], ResultPath: $.waitError, Next: WorkflowFailure}]
+              Next: CloseIntervention
+            CloseIntervention:
+              Type: Task
+              Resource: {Fn::GetAtt: [WorkflowCloseLambdaFunction, Arn]}
+              Parameters: {tenantId.$: '$.tenantId', assignmentId.$: '$.assignmentId', occurredAt.$: '$.intervention.occurredAt', notes.$: '$.intervention.notes'}
+              Retry: [{ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException], IntervalSeconds: 2, MaxAttempts: 3, BackoffRate: 2}]
+              End: true
+            WorkflowFailure:
+              Type: Task
+              Resource: {Fn::GetAtt: [WorkflowFailLambdaFunction, Arn]}
+              Parameters: {tenantId.$: '$.tenantId', assignmentId.$: '$.assignmentId', reason: InterventionCallbackTimeout}
+              Retry: [{ErrorEquals: [Lambda.ServiceException, Lambda.AWSLambdaException, Lambda.SdkClientException], IntervalSeconds: 2, MaxAttempts: 3, BackoffRate: 2}]
+              End: true
+            CoordinationEnded:
+              Type: Succeed
+  Outputs:
+    AuraTableName: {Value: {Ref: AuraTable}}
+    IncidentCoordinationStateMachineArn: {Value: {Ref: IncidentCoordinationStateMachine}}

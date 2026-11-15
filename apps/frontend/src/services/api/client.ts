@@ -68,22 +68,41 @@ export interface OperationsOverview {
   tasks: { total: number; pending: number; succeeded: number; failed: number; deadLetter: number };
   recentEvents: AgentEvent[]; domains: { inventory: string; technicianAssignment: string; incidents: string };
 }
+export interface ApiPage<T> { items: T[]; nextCursor?: string }
+export interface OperationalItem { entityId: string; entityType: string; machineId?: string; status?: string; severity?: string; priority?: string; title?: string; occurredAt?: string; createdAt: string; updatedAt: string; version?: number; [key: string]: unknown }
+export interface AuraTechnician { technicianId: string; displayName: string; availability: "available" | "unavailable"; specialties: string[]; skills: Array<{ code: string; level: number }>; maxConcurrentAssignments: number; version: number }
+export interface InventoryPart { partId: string; name: string; sku: string; unit: string; minimumStock: number; status: string }
+export interface InventoryBalance { stockId: string; partId: string; locationId: string; onHand: number; reserved: number; version: number }
+export interface AuraAssignment { assignmentId: string; incidentId: string; machineId: string; technicianId: string | null; status: string; severity: string; cost: number; costBreakdown: Record<string, number>; distanceKm?: number }
+export interface AuraKpis { period: { from: string; to: string }; mttr: { averageMinutes: number | null; resolvedIncidentCount: number }; downtime: { totalMinutes: number | null; reason: string }; recurrence: { windowDays: number; recurrentIncidentCount: number; incidentCount: number; percent: number | null }; responseSla: { responseSlaMinutes: number | null; acknowledgedCount: number; withinSlaCount: number; compliancePercent: number | null } }
 
 import { accessToken, authMode, selectedTenantId, expireSession, type TenantChoice } from "../auth/session";
 
 const apiBase = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api" : "https://ep40dq915l.execute-api.us-east-1.amazonaws.com")).replace(/\/$/, "");
 
+export class ApiError extends Error {
+  constructor(message: string, readonly status: number) { super(message); this.name = "ApiError"; }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  let response: Response;
-  try {
-    const headers = new Headers(init?.headers);
-    const token = authMode === "cognito" ? await accessToken() : undefined;
-    if (token) headers.set("authorization", `Bearer ${token}`);
-    const tenantId = authMode === "cognito" ? selectedTenantId() : undefined;
-    if (tenantId) headers.set("x-tenant-id", tenantId);
-    response = await fetch(apiBase + path, { ...init, headers });
+  let response: Response | undefined;
+  const safeGet = (init?.method ?? "GET").toUpperCase() === "GET";
+  for (let attempt = 0; attempt < (safeGet ? 3 : 1); attempt += 1) {
+    try {
+      const headers = new Headers(init?.headers);
+      const token = authMode === "cognito" ? await accessToken() : undefined;
+      if (token) headers.set("authorization", `Bearer ${token}`);
+      const tenantId = authMode === "cognito" ? selectedTenantId() : undefined;
+      if (tenantId) headers.set("x-tenant-id", tenantId);
+      response = await fetch(apiBase + path, { ...init, headers });
+      if (![502, 503, 504].includes(response.status) || attempt === 2) break;
+    }
+    catch {
+      if (!safeGet || attempt === 2) throw new Error("No se pudo conectar con la API.");
+    }
+    await new Promise((resolve) => window.setTimeout(resolve, 250 * (attempt + 1)));
   }
-  catch { throw new Error("No se pudo conectar con la API."); }
+  if (!response) throw new Error("No se pudo conectar con la API.");
 
   const envelope = await response.json().catch(() => ({}));
   if (!response.ok) {
@@ -91,7 +110,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       expireSession();
     }
     const details = envelope?.data?.details;
-    throw new Error(Array.isArray(details) ? details.join("; ") : envelope?.data?.error || "HTTP " + response.status);
+    throw new ApiError(Array.isArray(details) ? details.join("; ") : envelope?.data?.error || "HTTP " + response.status, response.status);
   }
   return envelope.data as T;
 }
@@ -116,4 +135,21 @@ export const fleetApi = {
     "/ingest/" + (file.name.toLowerCase().endsWith(".csv") ? "csv" : "json"),
     { method: "POST", headers: { "content-type": file.name.toLowerCase().endsWith(".csv") ? "text/csv" : "application/json" }, body: file },
   ),
+};
+
+export const operationsApi = {
+  incidents: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<OperationalItem>>("/incidents?" + query.toString()),
+  maintenance: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<OperationalItem>>("/maintenance/orders?" + query.toString()),
+};
+
+export const auraApi = {
+  technicians: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<AuraTechnician>>("/technicians?" + query.toString()),
+  parts: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<InventoryPart>>("/inventory/parts?" + query.toString()),
+  stock: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<InventoryBalance>>("/inventory/stock?" + query.toString()),
+  inventoryAlerts: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<Record<string, unknown>>>("/inventory/alerts?" + query.toString()),
+  assignments: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<AuraAssignment>>("/assignments?" + query.toString()),
+  events: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<OperationalItem>>("/aura/events?" + query.toString()),
+  kpis: (from: string, to: string) => request<AuraKpis>("/operations/kpis?" + new URLSearchParams({ from, to }).toString()),
+  optimize: (incidentIds: string[], idempotencyKey: string) => request<{ assignments: AuraAssignment[]; totalCost: number; workflowStarted: boolean; replayed: boolean }>("/assignments/optimize", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify({ incidentIds }) }),
+  respond: (assignmentId: string, body: Record<string, unknown>, idempotencyKey: string) => request<{ accepted: boolean; replayed: boolean }>("/assignments/" + encodeURIComponent(assignmentId) + "/response", { method: "POST", headers: { "content-type": "application/json", "idempotency-key": idempotencyKey }, body: JSON.stringify(body) }),
 };
