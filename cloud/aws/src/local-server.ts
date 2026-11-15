@@ -4,7 +4,7 @@ import { createApiHandlers, type ApiServices } from "./api/handlers";
 import { MAX_IMPORT_BYTES } from "./ingestion/service";
 import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
 
-const allowedMethods = "GET,POST,OPTIONS";
+const allowedMethods = "GET,POST,PUT,PATCH,OPTIONS";
 
 export function createLocalServer(services?: ApiServices): Server {
   const handlers = createApiHandlers(services);
@@ -13,7 +13,7 @@ export function createLocalServer(services?: ApiServices): Server {
     if (request.headers.origin === allowedOrigin) response.setHeader("access-control-allow-origin", allowedOrigin);
     response.setHeader("vary", "Origin");
     response.setHeader("access-control-allow-methods", allowedMethods);
-    response.setHeader("access-control-allow-headers", "content-type,authorization,x-tenant-id,idempotency-key,x-correlation-id");
+    response.setHeader("access-control-allow-headers", "content-type,authorization,x-tenant-id,idempotency-key,x-correlation-id,if-match");
     if (request.method === "OPTIONS") { response.writeHead(204).end(); return; }
 
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
@@ -28,7 +28,7 @@ export function createLocalServer(services?: ApiServices): Server {
         rawQueryString: url.search.slice(1),
         headers: request.headers as Record<string, string>,
         queryStringParameters: Object.fromEntries(url.searchParams.entries()),
-        pathParameters: route.machineId ? { machineId: route.machineId } : route.taskId ? { taskId: route.taskId } : undefined,
+        pathParameters: route.pathParameters,
         requestContext: {
           accountId: "local", apiId: "local", domainName: "localhost", domainPrefix: "localhost",
           http: { method: request.method ?? "GET", path: url.pathname, protocol: "HTTP/1.1", sourceIp: "127.0.0.1", userAgent: request.headers["user-agent"] ?? "local" },
@@ -63,7 +63,7 @@ async function readBody(request: IncomingMessage): Promise<string> {
 
 type HandlerSet = ReturnType<typeof createApiHandlers>;
 type LocalHandler = (event: APIGatewayProxyEventV2) => Promise<APIGatewayProxyResultV2>;
-function resolveRoute(method: string, pathname: string, handlers: HandlerSet): { handler: LocalHandler; machineId?: string; taskId?: string } | undefined {
+function resolveRoute(method: string, pathname: string, handlers: HandlerSet): { handler: LocalHandler; pathParameters?: Record<string, string> } | undefined {
   const path = pathname.replace(/\/+$/, "") || "/";
   if (method === "GET" && path === "/health") return { handler: handlers.health as LocalHandler };
   if (method === "POST" && path === "/ingest/csv") return { handler: handlers.ingestCsv as LocalHandler };
@@ -78,10 +78,25 @@ function resolveRoute(method: string, pathname: string, handlers: HandlerSet): {
   if (method === "GET" && path === "/tasks") return { handler: handlers.tasks as LocalHandler };
   if (method === "GET" && path === "/events") return { handler: handlers.taskEvents as LocalHandler };
   if (method === "GET" && path === "/operations/overview") return { handler: handlers.operationsOverview as LocalHandler };
+  if (method === "POST" && path === "/telemetry/batch") return { handler: handlers.telemetryBatch as LocalHandler };
+  if (method === "GET" && path === "/telemetry") return { handler: handlers.telemetry as LocalHandler };
+  if (method === "GET" && path === "/telemetry/latest") return { handler: handlers.latestTelemetry as LocalHandler };
+  if (method === "GET" && path === "/anomalies") return { handler: handlers.anomalies as LocalHandler };
+  if (method === "GET" && path === "/anomaly-rules") return { handler: handlers.getAnomalyRules as LocalHandler };
+  if (method === "PUT" && path === "/anomaly-rules") return { handler: handlers.putAnomalyRules as LocalHandler };
+  if (method === "GET" && path === "/incidents") return { handler: handlers.incidents as LocalHandler };
+  if (method === "GET" && path === "/maintenance/orders") return { handler: handlers.maintenanceOrders as LocalHandler };
+  if (method === "GET" && path === "/operations/events") return { handler: handlers.operationalEvents as LocalHandler };
+  if (method === "PATCH" && /^\/incidents\/[^/]+$/.test(path)) return { handler: handlers.updateIncident as LocalHandler, pathParameters: { incidentId: decodeURIComponent(path.split("/").at(-1)!) } };
+  if (method === "PATCH" && /^\/maintenance\/orders\/[^/]+$/.test(path)) return { handler: handlers.updateMaintenanceOrder as LocalHandler, pathParameters: { workOrderId: decodeURIComponent(path.split("/").at(-1)!) } };
+  const explainMatch = /^\/anomalies\/([^/]+)\/explanation$/.exec(path);
+  if (method === "POST" && explainMatch) return { handler: handlers.explainAnomaly as LocalHandler, pathParameters: { anomalyId: decodeURIComponent(explainMatch[1]) } };
+  const anomalyMatch = /^\/anomalies\/([^/]+)$/.exec(path);
+  if (method === "GET" && anomalyMatch) return { handler: handlers.getAnomaly as LocalHandler, pathParameters: { anomalyId: decodeURIComponent(anomalyMatch[1]) } };
   const taskMatch = /^\/tasks\/([^/]+)$/.exec(path);
-  if (method === "GET" && taskMatch) return { handler: handlers.getTask as LocalHandler, taskId: taskMatch[1] };
+  if (method === "GET" && taskMatch) return { handler: handlers.getTask as LocalHandler, pathParameters: { taskId: taskMatch[1] } };
   const machineMatch = /^\/machines\/(.+)$/.exec(path);
-  if (method === "GET" && machineMatch) return { handler: handlers.getMachine as LocalHandler, machineId: machineMatch[1] };
+  if (method === "GET" && machineMatch) return { handler: handlers.getMachine as LocalHandler, pathParameters: { machineId: decodeURIComponent(machineMatch[1]) } };
   return undefined;
 }
 

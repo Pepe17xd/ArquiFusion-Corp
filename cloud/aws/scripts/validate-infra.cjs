@@ -6,7 +6,7 @@ const YAML = require("yaml");
 const root = __dirname + "/..";
 const read = (name) => YAML.parse(readFileSync(join(root, name), "utf8"));
 const platform = read("serverless.yml");
-const domains = ["fleet", "ingestion", "intelligence", "supervisor"].map((domain) => read(`serverless.${domain}.yml`));
+const domains = ["fleet", "ingestion", "intelligence", "supervisor", "operations"].map((domain) => read(`serverless.${domain}.yml`));
 const all = [platform, ...domains];
 assert.equal(platform.service, "arquifusion-platform");
 assert.equal(platform.provider?.name, "aws");
@@ -15,7 +15,7 @@ assert.equal(platform.package?.individually, true);
 assert.match(platform.provider?.iam?.role ?? "", /AWS_LAMBDA_ROLE_ARN/, "shared LabRole ARN fallback must be explicit");
 assert.equal(platform.provider?.httpApi?.authorizers?.cognito?.type, "jwt");
 assert.ok(!platform.provider?.httpApi?.cors?.allowedOrigins?.includes("*"));
-assert.deepEqual(platform.provider?.httpApi?.cors?.allowedMethods, ["GET", "POST", "OPTIONS"]);
+assert.deepEqual(platform.provider?.httpApi?.cors?.allowedMethods, ["GET", "POST", "PUT", "PATCH", "OPTIONS"]);
 assert.ok(all.every((service) => service.package?.individually === true), "each service must package functions individually");
 
 const ownedResources = new Map();
@@ -36,6 +36,7 @@ const expectedServices = new Map([
   ["arquifusion-ingestion", ["ingestCsv", "ingestJson"]],
   ["arquifusion-intelligence", ["intelligence", "agents"]],
   ["arquifusion-supervisor", ["submitTask", "tasks", "getTask", "taskEvents", "operationsOverview", "runTask", "markTaskDeadLetter"]],
+  ["arquifusion-operations", ["telemetryBatch", "telemetry", "latestTelemetry", "anomalies", "getAnomaly", "explainAnomaly", "getAnomalyRules", "putAnomalyRules", "incidents", "updateIncident", "maintenanceOrders", "updateMaintenanceOrder", "operationalEvents", "processAnomaly"]],
 ]);
 const routes = new Set();
 let functionCount = 0;
@@ -46,7 +47,6 @@ for (const service of all) {
   functionCount += functions.length;
   if (service !== platform) {
     assert.match(service.provider?.httpApi?.id ?? "", /HTTP_API_ID/, `${service.service} must bind to the shared HTTP API`);
-    assert.equal(service.provider?.httpApi?.authorizers?.cognito?.type, "jwt", `${service.service} owns a Cognito JWT authorizer for its route resources`);
   }
   for (const [name, definition] of functions) {
     assert.equal(typeof definition.handler, "string", `${name} handler is required`);
@@ -60,8 +60,8 @@ for (const service of all) {
       const route = event.httpApi;
       assert.ok(route?.path && route?.method, `${name} HTTP route must be declared`);
       if (!(service === platform && name === "health")) {
-        assert.equal(route.authorizer?.name, "cognito", `${name} must require Cognito`);
-        const expectedScope = route.method === "POST" ? "arquifusion/write" : "arquifusion/read";
+        assert.ok(route.authorizer?.name === "cognito" || /HTTP_API_AUTHORIZER_ID/.test(route.authorizer?.id ?? ""), `${name} must require the shared Cognito authorizer`);
+        const expectedScope = ["POST", "PUT", "PATCH", "DELETE"].includes(route.method) ? "arquifusion/write" : "arquifusion/read";
         assert.ok(route.authorizer?.scopes?.includes(expectedScope), `${name} must require ${expectedScope}`);
       }
       const key = route.method + " " + route.path;
@@ -70,8 +70,8 @@ for (const service of all) {
     }
   }
 }
-assert.equal(functionCount, 17);
-assert.equal(routes.size, 15);
+assert.equal(functionCount, 31);
+assert.equal(routes.size, 28);
 
 const foundation = platform.resources.Resources;
 assert.equal(foundation.LegacyMachinesTable?.DeletionPolicy, "Retain");
@@ -99,7 +99,20 @@ assert.ok(states.EjecutarWorkflow.Retry?.length);
 assert.equal(states.EjecutarWorkflow.Catch?.[0]?.Next, "RegistrarFalloDurable");
 assert.equal(states.RegistrarFalloDurable.Next, "EjecucionFallida");
 assert.equal(states.EjecucionFallida.Type, "Fail");
-assert.ok(!domains.slice(0, 3).some((service) => Object.values(service.resources?.Resources ?? {}).some((resource) => resource.Type === "AWS::StepFunctions::StateMachine")), "only Supervisor owns workflow resources");
+assert.ok(domains.filter((service) => service.service !== "arquifusion-supervisor" && service.service !== "arquifusion-operations").every((service) => Object.values(service.resources?.Resources ?? {}).every((resource) => resource.Type !== "AWS::StepFunctions::StateMachine")), "only the Supervisor and operations domain own their separate workflow resources");
+const operations = domains.find((service) => service.service === "arquifusion-operations");
+const operationalTable = operations.resources.Resources.OperationalRecordsTable;
+assert.equal(operationalTable?.Type, "AWS::DynamoDB::Table");
+assert.equal(operationalTable?.DeletionPolicy, "Retain");
+assert.equal(operationalTable?.UpdateReplacePolicy, "Retain");
+assert.equal(operationalTable?.Properties?.BillingMode, "PAY_PER_REQUEST");
+assert.deepEqual(operationalTable?.Properties?.GlobalSecondaryIndexes?.map((index) => index.IndexName).sort(), ["ByTenantMachine", "ByTenantType"]);
+assert.equal(operationalTable?.Properties?.TimeToLiveSpecification?.AttributeName, "expiresAt");
+const anomalyWorkflow = operations.resources.Resources.AnomalyProcessingStateMachine;
+assert.equal(anomalyWorkflow?.Type, "AWS::StepFunctions::StateMachine");
+assert.equal(anomalyWorkflow?.Properties?.StateMachineType, "STANDARD");
+assert.ok(anomalyWorkflow?.Properties?.Definition?.States?.ProcessAnomaly?.Retry?.length);
+assert.ok(Object.values(operations.functions).filter((fn) => fn.events?.length).every((fn) => fn.role), "operational routes require dedicated pre-existing role ARNs");
 
 const cognito = read("infrastructure/cognito.yml");
 assert.equal(cognito.Resources.ArquiFusionUserPool.Properties.DeletionProtection, "ACTIVE");
@@ -117,4 +130,4 @@ const requestSchema = contract.paths["/v1/intelligence/analyze"].post.requestBod
 assert.ok(requestSchema, "intelligence endpoint must use a shared JSON schema");
 assert.ok(existsSync(join(require("node:path").dirname(contractPath), requestSchema)), "OpenAPI request schema reference must resolve from the contract file");
 
-process.stdout.write("Static checks passed: 5 Serverless stacks, 17 functions, 15 unique routes, shared resource ownership, external role references, JWT routes, retained tenant storage, Supervisor Standard workflow and the versioned intelligence contract. This is not CloudFormation validation; no AWS call or deployment was made.\n");
+process.stdout.write("Static checks passed: 6 Serverless stacks, 31 functions, 28 unique routes, retained tenant and operations tables, external least-privilege role references, JWT routes, separate Supervisor and operations Standard workflows and versioned contracts. This is not CloudFormation validation; no AWS call or deployment was made.\n");

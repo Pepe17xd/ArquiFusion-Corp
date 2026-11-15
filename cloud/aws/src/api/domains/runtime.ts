@@ -1,5 +1,6 @@
 import { loadConfig, type RuntimeDomain } from "../../core/config";
-import { createMachineRepository, createOriginalFileStore, createTaskDispatcher, createTaskStore, createTenantDirectory, createTokenVerifier } from "../../storage";
+import { createMachineRepository, createOperationalRepository, createOriginalFileStore, createTaskDispatcher, createTaskStore, createTenantDirectory, createTokenVerifier } from "../../storage";
+import { StepFunctionsAnomalyDispatcher } from "../../operations/step-functions-dispatcher";
 import { createRequestAuthorizer } from "../request-authorizer";
 
 export function createDomainRuntime(domain: RuntimeDomain) {
@@ -11,6 +12,8 @@ export function createDomainRuntime(domain: RuntimeDomain) {
     machines: () => createMachineRepository(config),
     originals: () => createOriginalFileStore(config),
     tasks: () => createTaskStore(config),
+    operations: () => createOperationalRepository(config),
+    operationsDispatcher: () => config.operationsStateMachineArn ? new StepFunctionsAnomalyDispatcher(config.operationsStateMachineArn) : undefined,
     dispatcher: () => createTaskDispatcher(config),
   };
 }

@@ -10,6 +10,9 @@ import { DynamoTenantDirectory } from "../tenancy/dynamo-tenant-directory";
 import { DynamoTaskStore } from "../supervisor/dynamo-task-store";
 import { StepFunctionsTaskDispatcher } from "../supervisor/step-functions-dispatcher";
 import { createCognitoAccessTokenVerifier } from "../security/cognito-token-verifier";
+import { DynamoOperationalRepository } from "../operations/dynamo-repository";
+import { LocalOperationalRepository } from "../operations/local-repository";
+import { StepFunctionsAnomalyDispatcher } from "../operations/step-functions-dispatcher";
 
 export function createMachineRepository(config: AppConfig): MachineRepository {
   return config.storageMode === "cloud" ? new DynamoMachineRepository(config.machinesTable!) : new LocalMachineRepository(config.localDataFile);
@@ -31,6 +34,13 @@ export function createTaskDispatcher(config: AppConfig) {
   return config.storageMode === "cloud" && config.taskStateMachineArn ? new StepFunctionsTaskDispatcher(config.taskStateMachineArn) : undefined;
 }
 
+export function createOperationalRepository(config: AppConfig) {
+  return config.storageMode === "cloud" ? new DynamoOperationalRepository(config.operationsTable!) : new LocalOperationalRepository(join(dirname(config.localDataFile), "operations.json"));
+}
+export function createOperationalWorkflow(config: AppConfig) {
+  return config.storageMode === "cloud" && config.operationsStateMachineArn ? new StepFunctionsAnomalyDispatcher(config.operationsStateMachineArn) : undefined;
+}
+
 export function createTokenVerifier(config: AppConfig) {
   return config.authMode === "cognito" ? createCognitoAccessTokenVerifier({ issuer: config.cognitoIssuer!, clientId: config.cognitoAudience! }) : undefined;
 }
@@ -41,7 +51,9 @@ export function createStorage(domain: RuntimeDomain = "all") {
   const originals = createOriginalFileStore(config);
   const tenants = createTenantDirectory(config);
   const tasks = createTaskStore(config);
+  const operations = config.storageMode === "local" || config.operationsTable ? createOperationalRepository(config) : undefined;
+  const operationsWorkflow = createOperationalWorkflow(config);
   const dispatcher = createTaskDispatcher(config);
   const tokenVerifier = createTokenVerifier(config);
-  return { machines, originals, tenants, authMode: config.authMode, storageMode: config.storageMode, tasks, dispatcher, tokenVerifier };
+  return { machines, originals, tenants, authMode: config.authMode, storageMode: config.storageMode, tasks, dispatcher, operations, operationsWorkflow, tokenVerifier };
 }

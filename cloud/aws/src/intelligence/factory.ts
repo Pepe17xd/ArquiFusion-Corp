@@ -21,8 +21,10 @@ export class FallbackIntelligence implements IntelligenceProvider {
 export function createIntelligenceProvider(env: NodeJS.ProcessEnv = process.env): IntelligenceProvider {
   const rules = new LangGraphFleetIntelligence();
   if (!env.INTELLIGENCE_SERVICE_URL || !env.INTELLIGENCE_API_KEY) return rules;
+  const configuredTimeout = Number(env.INTELLIGENCE_TIMEOUT_MS);
+  const timeoutMs = Number.isSafeInteger(configuredTimeout) && configuredTimeout >= 1_000 && configuredTimeout <= 100_000 ? configuredTimeout : undefined;
   return new FallbackIntelligence(
-    new RemoteGeminiIntelligence({ url: env.INTELLIGENCE_SERVICE_URL, apiKey: env.INTELLIGENCE_API_KEY }),
+    new RemoteGeminiIntelligence({ url: env.INTELLIGENCE_SERVICE_URL, apiKey: env.INTELLIGENCE_API_KEY, timeoutMs }),
     rules,
   );
 }

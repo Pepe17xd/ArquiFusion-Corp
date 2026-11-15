@@ -31,6 +31,7 @@ test("local configuration is explicit and never selects Cognito or cloud adapter
 test("cloud configuration fails closed unless durable storage, Cognito and HTTPS frontend origin are explicit", () => {
   const base = { STORAGE_MODE: "cloud", AUTH_MODE: "cognito", MACHINES_TABLE: "machines", TENANTS_TABLE: "tenants", TASKS_TABLE: "tasks", TASK_STATE_MACHINE_ARN: "arn:aws:states:us-east-1:123456789012:stateMachine:test", UPLOADS_BUCKET: "uploads", COGNITO_ISSUER: "https://cognito-idp.us-east-1.amazonaws.com/us-east-1_Test123", COGNITO_AUDIENCE: "public-client", WEB_ORIGIN: "https://console.example.test" };
   assert.equal(loadConfig(base).storageMode, "cloud");
+  assert.equal(loadConfig({ ...base, OPERATIONS_TABLE: "operations", OPERATIONS_STATE_MACHINE_ARN: "arn:aws:states:us-east-1:123456789012:stateMachine:operations" }, "operations").operationsTable, "operations");
   assert.throws(() => loadConfig({ ...base, WEB_ORIGIN: "*" }), ConfigurationError);
   assert.throws(() => loadConfig({ ...base, COGNITO_ISSUER: "https://issuer.example.test/pool" }), ConfigurationError);
   assert.throws(() => loadConfig({ ...base, COGNITO_ISSUER: "https://cognito-idp.us-east-1.amazonaws.com:8443/us-east-1_Test123" }), ConfigurationError);

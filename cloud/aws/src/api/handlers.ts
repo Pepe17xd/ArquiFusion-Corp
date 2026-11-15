@@ -19,6 +19,11 @@ import { createMetricsHandlers } from "./handlers/metrics";
 import { createIntelligenceHandlers } from "./handlers/intelligence";
 import { createTenantHandlers } from "./handlers/tenants";
 import { createSupervisorHandlers } from "./handlers/supervisor";
+import { createOperationsHandlers } from "./handlers/operations";
+import { OperationsService, type WorkflowDispatcher } from "../operations/service";
+import type { OperationalRepository } from "../operations/contracts";
+import { LocalOperationalRepository } from "../operations/local-repository";
+import type { IntelligenceProvider } from "../intelligence/contracts";
 
 export interface ApiServices {
   machines: MachineRepository;
@@ -27,6 +32,9 @@ export interface ApiServices {
   authMode?: "local" | "cognito";
   storageMode?: "local" | "cloud";
   tasks?: TaskStore;
+  operations?: OperationalRepository;
+  operationsWorkflow?: WorkflowDispatcher;
+  intelligenceProvider?: IntelligenceProvider;
   dispatcher?: TaskDispatcher;
   tokenVerifier?: AccessTokenVerifier;
 }
@@ -35,7 +43,7 @@ export interface ApiServices {
 export function createApiHandlers(services: ApiServices = createStorage()) {
   const authMode = services.authMode ?? "local";
   if (authMode === "cognito" && (!services.tenants || !services.tokenVerifier)) throw new Error("Cognito mode requires persistent tenant storage and a cryptographic access token verifier");
-  if (services.storageMode === "cloud" && (!services.tasks || !services.dispatcher || authMode !== "cognito")) throw new Error("Cloud mode requires persistent task storage, a durable dispatcher and Cognito authentication");
+  if (services.storageMode === "cloud" && (!services.tasks || !services.dispatcher || authMode !== "cognito" || (services.operations && !services.operationsWorkflow))) throw new Error("Cloud mode requires persistent task storage, durable dispatchers and Cognito authentication");
   const tenants = services.tenants ?? new LocalTenantDirectory(resolve(__dirname, "../../data/tenants.json"));
   const machines = services.machines;
   const originals = services.originals;
@@ -43,8 +51,13 @@ export function createApiHandlers(services: ApiServices = createStorage()) {
   const fleet = new FleetService(machines);
   const intelligence = new LangGraphFleetIntelligence();
   const tasks = services.tasks ?? new LocalTaskStore();
+  const operations = services.operations ?? (services.storageMode === "cloud" ? undefined : new LocalOperationalRepository(resolve(__dirname, "../../data/operations.json")));
   const supervisor = new AgentSupervisor(tasks, machines, intelligence, undefined, services.dispatcher);
   const auth = createRequestAuthorizer({ authMode, tenants, tokenVerifier: services.tokenVerifier });
+  const operationsService = operations ? new OperationsService(operations, machines, services.operationsWorkflow, services.intelligenceProvider ?? intelligence) : undefined;
+  const localOperationsWorkflow = authMode === "local" && !services.operationsWorkflow
+    ? { dispatch: (input: { tenantId: string; anomalyId: string }) => operationsService!.processAnomaly(input.tenantId, input.anomalyId).then(() => undefined) }
+    : undefined;
 
   return Object.assign(
     createHealthHandlers(),
@@ -54,6 +67,7 @@ export function createApiHandlers(services: ApiServices = createStorage()) {
     createIntelligenceHandlers(intelligence, machines, auth),
     createTenantHandlers(tenants, auth),
     createSupervisorHandlers(supervisor, machines, tasks, auth),
+    operationsService ? createOperationsHandlers(localOperationsWorkflow ? new OperationsService(operations!, machines, localOperationsWorkflow, services.intelligenceProvider ?? intelligence) : operationsService, auth) : {},
   );
 }
 

@@ -2,7 +2,9 @@
 
 ## Unidad y estado
 
-Este directorio contiene el backend TypeScript, el servidor local y cinco configuraciones Serverless: `serverless.yml` (platform), `serverless.fleet.yml`, `serverless.ingestion.yml`, `serverless.intelligence.yml` y `serverless.supervisor.yml`. Platform es propietario de la API HTTP, tablas compartidas y bucket; los cuatro stacks restantes registran sus rutas en esa API y Supervisor posee la State Machine. No se crean roles IAM: se referencia un rol preexistente con `AWS_LAMBDA_ROLE_ARN` (normalmente LabRole en Academy) y `AWS_STEP_FUNCTIONS_ROLE_ARN`.
+Este directorio contiene el backend TypeScript, el servidor local y seis configuraciones Serverless: `serverless.yml` (platform), `serverless.fleet.yml`, `serverless.ingestion.yml`, `serverless.intelligence.yml`, `serverless.supervisor.yml` y `serverless.operations.yml`. Platform es propietario de la API HTTP, tablas compartidas y bucket; los stacks de dominio registran sus rutas en esa API. Supervisor y Operations poseen State Machines independientes. No se crean roles IAM: cada stack referencia roles preexistentes.
+
+El MVP de Operations, sus contratos, patrones DynamoDB, roles, pruebas y procedimiento de despliegue revisado están en [OPERATIONS-MVP.md](./OPERATIONS-MVP.md). Revisar las dependencias dentro de cada ZIP antes de desplegar y no incluir credenciales en paquetes Serverless.
 
 ## Preparar y validar
 
@@ -28,6 +30,7 @@ npx serverless package --config serverless.fleet.yml --stage dev --region us-eas
 npx serverless package --config serverless.ingestion.yml --stage dev --region us-east-1
 npx serverless package --config serverless.intelligence.yml --stage dev --region us-east-1
 npx serverless package --config serverless.supervisor.yml --stage dev --region us-east-1
+  npx serverless package --config serverless.operations.yml --stage dev --region us-east-1
 ```
 
 Serverless Framework v4 puede requerir iniciar sesión o una licencia para empaquetar. No hemos verificado empaquetado, permisos ni despliegue en AWS Academy. La validación local de YAML no comprueba CloudFormation ni los permisos efectivos del laboratorio.
@@ -53,6 +56,7 @@ Configura en el entorno de despliegue (no las guardes en Git):
 - IAM existente: `AWS_LAMBDA_ROLE_ARN`, `AWS_STEP_FUNCTIONS_ROLE_ARN`; overrides opcionales por función: `HEALTH_ROLE_ARN`, `TENANT_READ_ROLE_ARN`, `TENANT_WRITE_ROLE_ARN`, `FLEET_READ_ROLE_ARN`, `INGESTION_WRITE_ROLE_ARN`, `INTELLIGENCE_READ_ROLE_ARN`, `SUPERVISOR_SUBMIT_ROLE_ARN`, `SUPERVISOR_READ_ROLE_ARN`, `SUPERVISOR_OVERVIEW_ROLE_ARN`, `SUPERVISOR_WORKER_ROLE_ARN`.
 - Plataforma: `AWS_ACCOUNT_ID`, `AWS_REGION`, `HTTP_API_ID`, `MACHINES_TABLE`, `LEGACY_MACHINES_TABLE`, `TENANTS_TABLE`, `TASKS_TABLE`, `UPLOADS_BUCKET`, `TASK_STATE_MACHINE_ARN`.
 - Cognito y CORS para despliegue: `COGNITO_ISSUER`, `COGNITO_AUDIENCE`, `WEB_ORIGIN`.
+- Operations: `OPERATIONS_TABLE`, `OPERATIONS_READ_ROLE_ARN`, `OPERATIONS_INGEST_ROLE_ARN`, `OPERATIONS_ADMIN_ROLE_ARN`, `OPERATIONS_WRITE_ROLE_ARN`, `OPERATIONS_WORKER_ROLE_ARN`, `OPERATIONS_STEP_FUNCTIONS_ROLE_ARN`, `HTTP_API_AUTHORIZER_ID`.
 - Desarrollo local opcional: `STORAGE_MODE=local`, `AUTH_MODE=local`, `SUPERVISOR_DATA_FILE`, `GMAIL_ALERT_RECIPIENT`.
 
 Usa `.env.example` como inventario; solo `VITE_*` se utiliza para configurar el frontend durante build y esos valores son públicos.

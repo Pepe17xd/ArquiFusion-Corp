@@ -4,6 +4,7 @@ import { NotFoundError } from "../core/errors";
 import { AuthenticationError, TenantAccessError, TenantConflictError } from "../tenancy/contracts";
 import { TaskDispatchError } from "../supervisor/contracts";
 import { randomUUID } from "node:crypto";
+import { OperationalConflictError, OperationalWorkflowDispatchError } from "../operations/contracts";
 
 export function jsonResponse(statusCode: number, data: unknown, headers: Record<string, string> = {}): APIGatewayProxyResultV2 {
   return {
@@ -50,6 +51,8 @@ export async function handleRequest(
     else if (error instanceof TenantAccessError) { status = 403; body = { error: "Access to this organization or operation is not permitted" }; }
     else if (error instanceof TenantConflictError) { status = 409; body = { error: error.message }; }
     else if (error instanceof TaskDispatchError) { status = 503; body = { error: error.message }; }
+    else if (error instanceof OperationalConflictError) { status = 409; body = { error: error.message }; }
+    else if (error instanceof OperationalWorkflowDispatchError) { status = 503; body = { error: error.message }; }
     const log = { requestId, correlationId, operation, tenantId: telemetry.tenantId, status, durationMs: Math.round(performance.now() - startedAt), errorName: error instanceof Error ? error.name : "UnknownError" };
     if (status === 401 || status === 403) console.warn(JSON.stringify({ event: "security.authorization.rejected", ...log }));
     else console.error(JSON.stringify({ event: "api.request.failed", ...log }));

@@ -1,0 +1,280 @@
+openapi: 3.1.0
+info:
+  title: ArquiFusion Operational API
+  version: 1.0.0
+  description: |-
+    Tenant-scoped telemetry, anomaly, incident and maintenance operations. Every response uses the existing {data: ...} API envelope.
+servers:
+  - url: https://{apiId}.execute-api.{region}.amazonaws.com
+    variables:
+      apiId: { default: api-id }
+      region: { default: us-east-1 }
+security:
+  - cognitoAccessToken: []
+paths:
+  /telemetry/batch:
+    post:
+      operationId: ingestTelemetryBatch
+      summary: Persist a telemetry batch and dispatch anomaly workflows
+      description: Tenant identity comes from the verified Cognito access token and membership. Body tenantId is rejected. Each batch has at most 10 readings and requires a unique idempotency key.
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [readings]
+              properties:
+                readings:
+                  type: array
+                  minItems: 1
+                  maxItems: 10
+                  items: {$ref: '#/components/schemas/TelemetryReading'}
+            example:
+              readings:
+                - machineId: EXC-001
+                  timestamp: '2026-11-15T15:10:00Z'
+                  metrics: {temperatureC: 96.4, vibrationMmS: 5.7, loadPercent: 72, rpm: 1550}
+      responses:
+        '200':
+          description: Telemetry persisted; includes whether this was an idempotent replay.
+          content: {application/json: {schema: {$ref: '#/components/schemas/BatchResponse'}}}
+        '400': {description: Invalid batch, units, timestamp or unknown tenant machine}
+        '409': {description: Duplicate reading or idempotency key reused with another request body}
+        '503': {description: Telemetry was persisted but workflow dispatch needs retry with the same idempotency key}
+  /telemetry:
+    get:
+      operationId: listTelemetry
+      summary: Read paginated telemetry history for one machine
+      parameters:
+        - {name: machineId, in: query, required: true, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Telemetry page, content: {application/json: {schema: {$ref: '#/components/schemas/TelemetryPageResponse'}}}}
+        '400': {description: Invalid query or cursor}
+  /telemetry/latest:
+    get:
+      operationId: getLatestTelemetry
+      summary: Read the latest telemetry reading for one machine
+      parameters:
+        - {name: machineId, in: query, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Latest reading or null, content: {application/json: {schema: {type: object}}}}
+  /anomaly-rules:
+    get:
+      operationId: getAnomalyRules
+      summary: Get tenant-configured rules or documented starter thresholds
+      responses:
+        '200': {description: Rule set, content: {application/json: {schema: {$ref: '#/components/schemas/RuleSetResponse'}}}}
+    put:
+      operationId: putAnomalyRules
+      summary: Replace the active tenant rule set (admin role)
+      description: Rules are deterministic and explainable. changePctGte does not fire without a previous non-zero reading.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [rules]
+              properties:
+                rules: {type: array, minItems: 1, maxItems: 4, items: {$ref: '#/components/schemas/AnomalyRule'}}
+      responses:
+        '200': {description: Saved rule set and incremented version}
+        '403': {description: Admin role and write scope are required}
+        '409': {description: Concurrent rule-set update}
+  /anomalies:
+    get:
+      operationId: listAnomalies
+      parameters:
+        - {name: machineId, in: query, required: false, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses:
+        '200': {description: Anomaly page}
+  /anomalies/{anomalyId}:
+    get:
+      operationId: getAnomaly
+      parameters:
+        - {name: anomalyId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Tenant-owned anomaly record}
+        '404': {description: Anomaly does not exist for this tenant}
+  /anomalies/{anomalyId}/explanation:
+    post:
+      operationId: explainAnomaly
+      summary: Explain a stored anomaly using the configured intelligence provider
+      description: The response reports gemini-api or deterministic-rules as provided by the backend. This endpoint does not create or change incidents, work orders, or machine state.
+      parameters:
+        - {name: anomalyId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Evidence-backed explanation and actual provider source}
+        '404': {description: Anomaly not found}
+  /incidents:
+    get:
+      operationId: listIncidents
+      parameters:
+        - {name: machineId, in: query, required: false, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses: {'200': {description: Incident page}}
+  /incidents/{incidentId}:
+    patch:
+      operationId: updateIncident
+      parameters:
+        - {name: incidentId, in: path, required: true, schema: {type: string}}
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                status: {type: string, enum: [open, acknowledged, resolved]}
+                assignedTo: {type: [string, 'null'], maxLength: 128}
+                resolution: {type: string, maxLength: 2000}
+      responses:
+        '200': {description: Updated versioned incident and persisted update event}
+        '409': {description: If-Match version is stale}
+  /maintenance/orders:
+    get:
+      operationId: listMaintenanceOrders
+      parameters:
+        - {name: machineId, in: query, required: false, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses: {'200': {description: Maintenance order page}}
+  /maintenance/orders/{workOrderId}:
+    patch:
+      operationId: updateMaintenanceOrder
+      parameters:
+        - {name: workOrderId, in: path, required: true, schema: {type: string}}
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                status: {type: string, enum: [planned, in_progress, completed, cancelled]}
+                assignedTechnicianId: {type: [string, 'null'], maxLength: 128}
+                intervention:
+                  type: object
+                  additionalProperties: false
+                  required: [occurredAt, notes]
+                  properties:
+                    occurredAt: {type: string, format: date-time}
+                    notes: {type: string, minLength: 1, maxLength: 2000}
+      responses:
+        '200': {description: Updated versioned order and persisted update event}
+        '409': {description: If-Match version is stale}
+  /operations/events:
+    get:
+      operationId: listOperationalEvents
+      parameters:
+        - {name: machineId, in: query, required: false, schema: {type: string}}
+        - $ref: '#/components/parameters/Limit'
+        - $ref: '#/components/parameters/Cursor'
+      responses: {'200': {description: Operational event page; separate from the existing Supervisor GET /events}}
+components:
+  securitySchemes:
+    cognitoAccessToken: {type: http, scheme: bearer, bearerFormat: JWT}
+  parameters:
+    IdempotencyKey: {name: idempotency-key, in: header, required: true, schema: {type: string, minLength: 1, maxLength: 200, pattern: '^[a-zA-Z0-9._:-]+$'}}
+    Limit: {name: limit, in: query, required: false, schema: {type: integer, minimum: 1, maximum: 100, default: 25}}
+    Cursor: {name: cursor, in: query, required: false, schema: {type: string, maxLength: 4096}}
+    IfMatch: {name: If-Match, in: header, required: true, schema: {type: string, pattern: '^(?:W/)?"?[0-9]+"?$'}, description: Current record version, for example "1"}
+  schemas:
+    TelemetryReading:
+      type: object
+      additionalProperties: false
+      required: [machineId, timestamp, metrics]
+      properties:
+        machineId: {type: string, minLength: 1, maxLength: 128}
+        timestamp: {type: string, format: date-time}
+        metrics:
+          type: object
+          minProperties: 1
+          additionalProperties: false
+          properties:
+            temperatureC: {type: number, minimum: -50, maximum: 250, description: Degrees Celsius}
+            vibrationMmS: {type: number, minimum: 0, maximum: 100, description: Millimeters per second}
+            pressureKPa: {type: number, minimum: 0, maximum: 100000, description: Kilopascals}
+            fuelConsumptionLph: {type: number, minimum: 0, maximum: 2000, description: Liters per hour}
+            operatingHours: {type: number, minimum: 0, maximum: 1000000, description: Cumulative hours}
+            loadPercent: {type: number, minimum: 0, maximum: 200, description: Percent of rated load}
+            speedKph: {type: number, minimum: 0, maximum: 200, description: Kilometers per hour}
+            rpm: {type: number, minimum: 0, maximum: 10000, description: Revolutions per minute}
+    AnomalyRule:
+      type: object
+      additionalProperties: false
+      required: [ruleId, title, explanation, severity, match, conditions, enabled]
+      properties:
+        ruleId: {type: string, minLength: 1, maxLength: 100}
+        title: {type: string, minLength: 1, maxLength: 160}
+        explanation: {type: string, minLength: 1, maxLength: 500}
+        severity: {type: string, enum: [info, warning, critical]}
+        match: {type: string, enum: [all, any]}
+        enabled: {type: boolean}
+        conditions:
+          type: array
+          minItems: 1
+          maxItems: 3
+          items:
+            type: object
+            additionalProperties: false
+            required: [metric, operator, threshold]
+            properties:
+              metric: {type: string, enum: [temperatureC, vibrationMmS, pressureKPa, fuelConsumptionLph, operatingHours, loadPercent, speedKph, rpm]}
+              operator: {type: string, enum: [gt, gte, lt, lte, changePctGte]}
+              threshold: {type: number, description: Threshold uses the selected metric unit; changePctGte accepts a non-negative percentage from 0 to 100000}
+    BatchResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            accepted: {type: integer}
+            anomalyCount: {type: integer}
+            anomalies: {type: array, items: {type: object, required: [anomalyId, machineId, severity], properties: {anomalyId: {type: string}, machineId: {type: string}, severity: {type: string}}}}
+            replayed: {type: boolean}
+    RuleSetResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          required: [version, rules, configured]
+          properties:
+            version: {type: integer}
+            configured: {type: boolean}
+            defaults: {type: [string, 'null']}
+            rules: {type: array, items: {$ref: '#/components/schemas/AnomalyRule'}}
+    TelemetryPageResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            items: {type: array, items: {$ref: '#/components/schemas/TelemetryRecord'}}
+            nextCursor: {type: [string, 'null']}
+    TelemetryRecord:
+      type: object
+      required: [tenantId, entityType, entityId, machineId, timestamp, metrics, createdAt, updatedAt]
+      properties:
+        tenantId: {type: string}
+        entityType: {const: TELEMETRY}
+        entityId: {type: string}
+        machineId: {type: string}
+        timestamp: {type: string, format: date-time}
+        metrics: {$ref: '#/components/schemas/TelemetryReading/properties/metrics'}
+        createdAt: {type: string, format: date-time}
+        updatedAt: {type: string, format: date-time}

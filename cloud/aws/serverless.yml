@@ -13,8 +13,8 @@ provider:
   httpApi:
     cors:
       allowedOrigins: ['${env:WEB_ORIGIN}']
-      allowedHeaders: [content-type, authorization, x-tenant-id, idempotency-key, x-correlation-id]
-      allowedMethods: [GET, POST, OPTIONS]
+      allowedHeaders: [content-type, authorization, x-tenant-id, idempotency-key, x-correlation-id, if-match]
+      allowedMethods: [GET, POST, PUT, PATCH, OPTIONS]
     authorizers:
       cognito:
         type: jwt
