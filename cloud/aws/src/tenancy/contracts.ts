@@ -1,5 +1,5 @@
-export type TenantRole = "owner" | "admin" | "operator" | "viewer";
-export const isTenantRole = (value: unknown): value is TenantRole => ["owner", "admin", "operator", "viewer"].includes(String(value));
+export type TenantRole = "owner" | "admin" | "operator" | "technician" | "viewer";
+export const isTenantRole = (value: unknown): value is TenantRole => ["owner", "admin", "operator", "technician", "viewer"].includes(String(value));
 
 export interface Tenant {
   tenantId: string;
@@ -13,6 +13,7 @@ export interface TenantMembership {
   userSub: string;
   role: TenantRole;
   createdAt: string;
+  status?: "active" | "disabled";
 }
 
 /** Tenant context is derived only after authenticating the user and checking membership. */
@@ -24,9 +25,13 @@ export interface TenantContext {
 }
 
 export interface TenantDirectory {
+  assertUserActive(userSub: string): Promise<void>;
   resolve(userSub: string, requestedTenantId?: string): Promise<TenantContext>;
   listForUser(userSub: string): Promise<Array<{ tenant: Tenant; membership: TenantMembership }>>;
   createTenant(userSub: string, name: string, idempotencyKey: string): Promise<{ tenant: Tenant; membership: TenantMembership }>;
+  addTechnicianMember(tenantId: string, userSub: string): Promise<TenantMembership>;
+  disableTechnicianMember(tenantId: string, userSub: string): Promise<void>;
+  disableUser(userSub: string): Promise<void>;
 }
 
 export class AuthenticationError extends Error {

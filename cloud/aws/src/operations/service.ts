@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { NotFoundError } from "../core/errors";
 import { ValidationError } from "../core/machine";
 import type { Machine } from "../core/machine";
 import type { MachineRepository } from "../storage/contracts";
@@ -107,6 +108,61 @@ export class OperationsService {
     return this.repository.get(tenantId, entityType, entityId);
   }
 
+  async createManualIncident(tenantId: string, idempotencyKey: string, input: { machineId: string; type: string; severity: "info" | "warning" | "critical"; description: string }, actor: { userSub: string; role: string }) {
+    const machine = await this.machines.get(tenantId, input.machineId);
+    if (!machine) throw new ValidationError(["machineId does not exist in this organization"]);
+    const requestHash = idempotencyHash(input);
+    const entityId = stableId(`manual-incident|${tenantId}|${idempotencyKey}`);
+    const existing = await this.repository.get(tenantId, "INCIDENT", entityId);
+    if (existing) {
+      if (existing.requestHash !== requestHash) throw new TenantConflictError("Idempotency key was already used with different incident data");
+      return { incident: existing, replayed: true };
+    }
+    const now = new Date().toISOString();
+    const incident: OperationalRecord = { tenantId, entityType: "INCIDENT", entityId, machineId: input.machineId, type: input.type, title: input.type, severity: input.severity, description: input.description, status: "open", detectedAt: now, occurredAt: now, evidence: [], createdBy: actor.userSub, requestHash, history: [{ status: "open", at: now, actorSub: actor.userSub, actorRole: actor.role }], version: 1, createdAt: now, updatedAt: now };
+    const event = makeEvent(tenantId, "IncidentCreatedManually", entityId, input.machineId, { severity: input.severity, type: input.type, actorSub: actor.userSub }, now);
+    try { await this.repository.createMany([incident, event]); }
+    catch (error) {
+      const raced = await this.repository.get(tenantId, "INCIDENT", entityId);
+      if (raced?.requestHash === requestHash) return { incident: raced, replayed: true };
+      throw error;
+    }
+    return { incident, replayed: false };
+  }
+
+  async createWorkOrderFromIncident(tenantId: string, incidentId: string, actor: { userSub: string; role: string }) {
+    const incident = await this.repository.get(tenantId, "INCIDENT", incidentId);
+    if (!incident) throw new NotFoundError("Incident not found");
+    const linked = typeof incident.workOrderId === "string" ? await this.repository.get(tenantId, "WORK_ORDER", incident.workOrderId) : undefined;
+    const prior = linked ?? await this.findWorkOrderForIncident(tenantId, incidentId);
+    if (prior) return { workOrder: prior, replayed: true };
+    const workOrderId = stableId(`manual-work-order|${tenantId}|${incidentId}`);
+    const existing = await this.repository.get(tenantId, "WORK_ORDER", workOrderId);
+    if (existing) return { workOrder: existing, replayed: true };
+    const now = new Date().toISOString();
+    const workOrder: OperationalRecord = { tenantId, entityType: "WORK_ORDER", entityId: workOrderId, machineId: String(incident.machineId), incidentId, anomalyId: incident.anomalyId, type: "corrective", priority: incident.severity === "critical" ? "high" : incident.severity === "warning" ? "medium" : "low", status: "planned", assignedTechnicianId: null, interventions: [], partsUsed: [], history: [{ status: "planned", at: now, source: "incident", actorSub: actor.userSub, actorRole: actor.role }], version: 1, createdAt: now, updatedAt: now };
+    const updatedIncident: OperationalRecord = { ...incident, workOrderId, version: Number(incident.version ?? 0) + 1, updatedAt: now, history: [...(Array.isArray(incident.history) ? incident.history : []), { status: incident.status, at: now, action: "maintenance-order-created", workOrderId, actorSub: actor.userSub, actorRole: actor.role }] };
+    const events = [makeEvent(tenantId, "MaintenanceOrderCreated", workOrderId, String(incident.machineId), { incidentId, priority: workOrder.priority, type: "corrective" }, now), makeEvent(tenantId, "IncidentMaintenanceLinked", incidentId, String(incident.machineId), { workOrderId }, now)];
+    try { await this.repository.createWorkOrderForIncident(updatedIncident, Number(incident.version ?? 0), workOrder, events); }
+    catch (error) {
+      const raced = await this.repository.get(tenantId, "WORK_ORDER", workOrderId);
+      if (raced) return { workOrder: raced, replayed: true };
+      throw error;
+    }
+    return { workOrder, replayed: false };
+  }
+
+  private async findWorkOrderForIncident(tenantId: string, incidentId: string) {
+    let cursor: string | undefined;
+    do {
+      const page = await this.repository.queryByType(tenantId, "WORK_ORDER", 100, cursor);
+      const match = page.items.find((item) => item.incidentId === incidentId);
+      if (match) return match;
+      cursor = page.nextCursor;
+    } while (cursor);
+    return undefined;
+  }
+
   async processAnomaly(tenantId: string, anomalyId: string) {
     const anomaly = await this.repository.get(tenantId, "ANOMALY", anomalyId);
     if (!anomaly) throw new ValidationError(["Anomaly does not exist in this organization"]);
@@ -115,7 +171,7 @@ export class OperationsService {
       const incidentId = stableId(`incident|${anomalyId}`);
       const workOrderId = stableId(`work-order|${anomalyId}`);
       const now = new Date().toISOString();
-      records.push({ tenantId, entityType: "INCIDENT", entityId: incidentId, machineId: anomaly.machineId, anomalyId, severity: "critical", status: "open", title: anomaly.title, cause: anomaly.explanation, occurredAt: anomaly.timestamp, history: [{ status: "open", at: now, source: "anomaly-workflow" }], version: 1, createdAt: now, updatedAt: now });
+      records.push({ tenantId, entityType: "INCIDENT", entityId: incidentId, machineId: anomaly.machineId, anomalyId, workOrderId, severity: "critical", status: "open", title: anomaly.title, cause: anomaly.explanation, occurredAt: anomaly.timestamp, history: [{ status: "open", at: now, source: "anomaly-workflow" }], version: 1, createdAt: now, updatedAt: now });
       records.push({ tenantId, entityType: "WORK_ORDER", entityId: workOrderId, machineId: anomaly.machineId, incidentId, anomalyId, type: "corrective", priority: "high", status: "planned", assignedTechnicianId: null, interventions: [], partsUsed: [], history: [{ status: "planned", at: now, source: "anomaly-workflow" }], version: 1, createdAt: now, updatedAt: now });
       records.push(makeEvent(tenantId, "IncidentCreated", incidentId, String(anomaly.machineId), { anomalyId, severity: anomaly.severity }, now));
       records.push(makeEvent(tenantId, "MaintenanceOrderCreated", workOrderId, String(anomaly.machineId), { anomalyId, priority: "high", type: "corrective" }, now));
@@ -142,26 +198,38 @@ export class OperationsService {
     return { anomalyId, source: result.source, generatedAt: result.generatedAt, recommendations: result.recommendations.filter((item) => item.machineId === anomaly.machineId), evidence: anomaly.evidence };
   }
 
-  async updateIncident(tenantId: string, incidentId: string, input: { expectedVersion: number; status?: "open" | "acknowledged" | "resolved"; assignedTo?: string | null; resolution?: string }) {
+  async updateIncident(tenantId: string, incidentId: string, input: { expectedVersion: number; status?: "open" | "analyzing" | "pending_assignment" | "assigned" | "acknowledged" | "in_progress" | "resolved" | "closed"; assignedTo?: string | null; resolution?: string; actorSub?: string; actorRole?: string }) {
     const current = await this.repository.get(tenantId, "INCIDENT", incidentId);
     if (!current) throw new ValidationError(["Incident does not exist in this organization"]);
     if (current.version !== input.expectedVersion) throw new OperationalConflictError();
-    if (input.status && !({ open: ["open", "acknowledged", "resolved"], acknowledged: ["acknowledged", "open", "resolved"], resolved: ["resolved"] } as Record<string, string[]>)[String(current.status)]?.includes(input.status)) throw new ValidationError(["Invalid incident status transition"]);
-    if (input.status === "resolved" && !input.resolution?.trim()) throw new ValidationError(["resolution is required when status is resolved"]);
+    const transitions: Record<string, string[]> = {
+      open: ["open", "analyzing", "pending_assignment", "assigned", "acknowledged", "resolved"],
+      analyzing: ["analyzing", "pending_assignment", "open", "acknowledged"],
+      pending_assignment: ["pending_assignment", "assigned", "open"],
+      assigned: ["assigned", "in_progress", "acknowledged", "open"],
+      acknowledged: ["acknowledged", "in_progress", "resolved", "open"],
+      in_progress: ["in_progress", "resolved"], resolved: ["resolved", "closed"], closed: ["closed"],
+    };
+    if (input.status && !transitions[String(current.status)]?.includes(input.status)) throw new ValidationError(["Invalid incident status transition"]);
+    if (["resolved", "closed"].includes(String(input.status)) && !input.resolution?.trim()) throw new ValidationError(["resolution is required when incident is resolved or closed"]);
     const now = new Date().toISOString();
-    const updated = { ...current, ...(input.status ? { status: input.status } : {}), ...(input.assignedTo !== undefined ? { assignedTo: input.assignedTo } : {}), ...(input.resolution ? { resolution: input.resolution.trim() } : {}), history: [...(current.history as unknown[]), { status: input.status ?? current.status, at: now, assignedTo: input.assignedTo }], version: input.expectedVersion + 1, updatedAt: now };
+    const updated = { ...current, ...(input.status ? { status: input.status } : {}), ...(input.assignedTo !== undefined ? { assignedTo: input.assignedTo } : {}), ...(input.resolution ? { resolution: input.resolution.trim() } : {}), history: [...(Array.isArray(current.history) ? current.history : []), { status: input.status ?? current.status, at: now, assignedTo: input.assignedTo, actorSub: input.actorSub, actorRole: input.actorRole }], version: input.expectedVersion + 1, updatedAt: now };
     await this.repository.updateWithEvents(updated, input.expectedVersion, [makeEvent(tenantId, "IncidentUpdated", incidentId, String(current.machineId), { status: updated.status, version: updated.version }, now, String(updated.version))]);
     return updated;
   }
 
-  async updateWorkOrder(tenantId: string, workOrderId: string, input: { expectedVersion: number; status?: "planned" | "in_progress" | "completed" | "cancelled"; assignedTechnicianId?: string | null; intervention?: { occurredAt: string; notes: string } }) {
+  async updateWorkOrder(tenantId: string, workOrderId: string, input: { expectedVersion: number; status?: "planned" | "assigned" | "in_progress" | "blocked" | "completed" | "approved" | "closed" | "cancelled"; assignedTechnicianId?: string | null; intervention?: { occurredAt: string; notes: string }; actorSub?: string; actorRole?: string }) {
     const current = await this.repository.get(tenantId, "WORK_ORDER", workOrderId);
     if (!current) throw new ValidationError(["Maintenance order does not exist in this organization"]);
     if (current.version !== input.expectedVersion) throw new OperationalConflictError();
-    const allowed: Record<string, string[]> = { planned: ["planned", "in_progress", "cancelled"], in_progress: ["in_progress", "completed", "cancelled"], completed: ["completed"], cancelled: ["cancelled"] };
+    const allowed: Record<string, string[]> = {
+      planned: ["planned", "assigned", "in_progress", "cancelled"], assigned: ["assigned", "in_progress", "cancelled"],
+      in_progress: ["in_progress", "blocked", "completed", "cancelled"], blocked: ["blocked", "in_progress", "completed", "cancelled"],
+      completed: ["completed", "approved", "in_progress"], approved: ["approved", "closed"], closed: ["closed"], cancelled: ["cancelled"],
+    };
     if (input.status && !allowed[String(current.status)]?.includes(input.status)) throw new ValidationError(["Invalid maintenance order status transition"]);
     const now = new Date().toISOString();
-    const history = [...(current.history as unknown[]), ...(input.status ? [{ status: input.status, at: now }] : [])];
+    const history = [...(Array.isArray(current.history) ? current.history : []), ...(input.status ? [{ status: input.status, at: now, actorSub: input.actorSub, actorRole: input.actorRole }] : [])];
     const interventions = [...(current.interventions as unknown[]), ...(input.intervention ? [input.intervention] : [])];
     const updated = { ...current, ...(input.status ? { status: input.status } : {}), ...(input.assignedTechnicianId !== undefined ? { assignedTechnicianId: input.assignedTechnicianId } : {}), history, interventions, version: input.expectedVersion + 1, updatedAt: now };
     await this.repository.updateWithEvents(updated, input.expectedVersion, [makeEvent(tenantId, "MaintenanceOrderUpdated", workOrderId, String(current.machineId), { status: updated.status, version: updated.version }, now, String(updated.version))]);

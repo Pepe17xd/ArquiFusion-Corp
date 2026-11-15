@@ -116,6 +116,28 @@ paths:
         '200': {description: Evidence-backed explanation and actual provider source}
         '404': {description: Anomaly not found}
   /incidents:
+    post:
+      operationId: createIncident
+      summary: Create an administrator-entered incident without requiring a Gemini result
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [machineId, type, severity, description]
+              properties:
+                machineId: {type: string, minLength: 1, maxLength: 128}
+                type: {type: string, minLength: 1, maxLength: 100}
+                severity: {type: string, enum: [info, warning, critical]}
+                description: {type: string, minLength: 1, maxLength: 2000}
+      responses:
+        '200': {description: Incident created or idempotent replay}
+        '403': {description: Administrator role is required}
+        '409': {description: Idempotency key was reused with another body}
     get:
       operationId: listIncidents
       parameters:
@@ -123,6 +145,16 @@ paths:
         - $ref: '#/components/parameters/Limit'
         - $ref: '#/components/parameters/Cursor'
       responses: {'200': {description: Incident page}}
+  /incidents/{incidentId}/maintenance-orders:
+    post:
+      operationId: createMaintenanceOrderFromIncident
+      summary: Create a corrective maintenance order for an incident, regardless of whether Gemini analysis exists
+      parameters:
+        - {name: incidentId, in: path, required: true, schema: {type: string}}
+      responses:
+        '200': {description: Corrective order created or idempotent replay}
+        '403': {description: Administrator role is required}
+        '404': {description: Incident not found in this tenant}
   /incidents/{incidentId}:
     patch:
       operationId: updateIncident
@@ -137,7 +169,7 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                status: {type: string, enum: [open, acknowledged, resolved]}
+                status: {type: string, enum: [open, analyzing, pending_assignment, assigned, acknowledged, in_progress, resolved, closed]}
                 assignedTo: {type: [string, 'null'], maxLength: 128}
                 resolution: {type: string, maxLength: 2000}
       responses:
@@ -165,7 +197,7 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                status: {type: string, enum: [planned, in_progress, completed, cancelled]}
+                status: {type: string, enum: [planned, assigned, in_progress, blocked, completed, approved, closed, cancelled]}
                 assignedTechnicianId: {type: [string, 'null'], maxLength: 128}
                 intervention:
                   type: object

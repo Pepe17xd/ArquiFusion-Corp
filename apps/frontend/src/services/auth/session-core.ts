@@ -14,6 +14,7 @@ export interface SessionRuntime {
 const ACCESS_KEY = "arquifusion.access-token";
 const REFRESH_KEY = "arquifusion.refresh-token";
 const TENANT_KEY = "arquifusion.tenant-id";
+const TENANT_ROLE_KEY = "arquifusion.tenant-role";
 const VERIFIER_KEY = "arquifusion.pkce-verifier";
 const STATE_KEY = "arquifusion.oauth-state";
 
@@ -29,7 +30,7 @@ function expiry(token: string) {
 }
 
 export function createSessionClient(runtime: SessionRuntime) {
-  const clearTenant = () => runtime.storage.removeItem(TENANT_KEY);
+  const clearTenant = () => { runtime.storage.removeItem(TENANT_KEY); runtime.storage.removeItem(TENANT_ROLE_KEY); };
   const clearSession = () => { runtime.storage.removeItem(ACCESS_KEY); runtime.storage.removeItem(REFRESH_KEY); clearTenant(); };
 
   async function beginLogin(signup = false) {
@@ -123,7 +124,8 @@ export function createSessionClient(runtime: SessionRuntime) {
     expireSession: () => { clearSession(); runtime.onExpired?.(); },
     hasSession: () => Boolean(runtime.storage.getItem(ACCESS_KEY)),
     selectedTenantId: () => runtime.storage.getItem(TENANT_KEY) || undefined,
-    selectTenant: (tenantId: string) => runtime.storage.setItem(TENANT_KEY, tenantId),
+    selectedTenantRole: () => runtime.storage.getItem(TENANT_ROLE_KEY) || undefined,
+    selectTenant: (tenantId: string, role?: string) => { runtime.storage.setItem(TENANT_KEY, tenantId); if (role) runtime.storage.setItem(TENANT_ROLE_KEY, role); else runtime.storage.removeItem(TENANT_ROLE_KEY); },
     clearTenant, clearSession,
   };
 }

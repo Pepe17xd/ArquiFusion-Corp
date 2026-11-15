@@ -31,13 +31,13 @@ assert.equal([...ownedResources.values()].filter((owner) => owner === platform.s
 assert.ok(!all.some((service) => Object.values(service.resources?.Resources ?? {}).some((resource) => resource.Type === "AWS::IAM::Role")), "templates must not create IAM roles");
 
 const expectedServices = new Map([
-  ["arquifusion-platform", ["health", "listTenants", "createTenant"]],
+  ["arquifusion-platform", ["health", "listTenants", "createTenant", "addTechnicianMember"]],
   ["arquifusion-fleet", ["listMachines", "getMachine", "metrics"]],
   ["arquifusion-ingestion", ["ingestCsv", "ingestJson"]],
   ["arquifusion-intelligence", ["intelligence", "agents"]],
   ["arquifusion-supervisor", ["submitTask", "tasks", "getTask", "taskEvents", "operationsOverview", "runTask", "markTaskDeadLetter"]],
-  ["arquifusion-operations", ["telemetryBatch", "telemetry", "latestTelemetry", "anomalies", "getAnomaly", "explainAnomaly", "getAnomalyRules", "putAnomalyRules", "incidents", "updateIncident", "maintenanceOrders", "updateMaintenanceOrder", "operationalEvents", "processAnomaly"]],
-  ["arquifusion-aura", ["technicians", "saveTechnician", "getTechnician", "archiveTechnician", "putMachineCoordinates", "parts", "createPart", "stock", "inventoryAlerts", "movements", "createMovement", "reserve", "releaseReservation", "optimize", "assignments", "assignment", "assignmentResponse", "policy", "savePolicy", "kpis", "events", "workflowCapture", "workflowNext", "workflowAccept", "workflowClose", "workflowFail"]],
+  ["arquifusion-operations", ["telemetryBatch", "telemetry", "latestTelemetry", "anomalies", "getAnomaly", "explainAnomaly", "getAnomalyRules", "putAnomalyRules", "incidents", "createIncident", "createIncidentMaintenanceOrder", "updateIncident", "maintenanceOrders", "updateMaintenanceOrder", "operationalEvents", "processAnomaly"]],
+  ["arquifusion-aura", ["technicians", "technicianMe", "technicianWorkOrders", "technicianWorkOrderAnalysis", "technicianStartWorkOrder", "technicianBlockWorkOrder", "technicianCompleteWorkOrder", "technicianReservePart", "technicianConsumeReservation", "saveTechnician", "inviteTechnician", "getTechnician", "archiveTechnician", "putMachineCoordinates", "parts", "createPart", "updatePart", "stock", "inventoryAlerts", "movements", "createMovement", "reserve", "releaseReservation", "optimize", "assignments", "assignment", "assignmentResponse", "approveAssignment", "reviewWorkOrder", "policy", "savePolicy", "kpis", "events", "workflowCapture", "workflowNext", "workflowAccept", "workflowClose", "workflowFail"]],
 ]);
 const routes = new Set();
 let functionCount = 0;
@@ -76,8 +76,8 @@ for (const service of all) {
     }
   }
 }
-assert.equal(functionCount, 57);
-assert.equal(routes.size, 49);
+assert.equal(functionCount, 72);
+assert.equal(routes.size, 64);
 
 const foundation = platform.resources.Resources;
 assert.equal(foundation.LegacyMachinesTable?.DeletionPolicy, "Retain");
@@ -108,11 +108,13 @@ assert.equal(states.EjecucionFallida.Type, "Fail");
 assert.ok(domains.filter((service) => !["arquifusion-supervisor", "arquifusion-operations", "arquifusion-aura"].includes(service.service)).every((service) => Object.values(service.resources?.Resources ?? {}).every((resource) => resource.Type !== "AWS::StepFunctions::StateMachine")), "only the Supervisor, Operations and AURA domains own their separate workflow resources");
 const operations = domains.find((service) => service.service === "arquifusion-operations");
 const operationalTable = operations.resources.Resources.OperationalRecordsTable;
+assert.ok(operationalTable.Properties.AttributeDefinitions.some((attribute) => attribute.AttributeName === "gsi3pk"));
+assert.equal(operationalTable.Properties.GlobalSecondaryIndexes.find((index) => index.IndexName === "ByTenantAssignee")?.KeySchema?.[0]?.AttributeName, "gsi3pk", "technician work-order reads must use the tenant/assignee index");
 assert.equal(operationalTable?.Type, "AWS::DynamoDB::Table");
 assert.equal(operationalTable?.DeletionPolicy, "Retain");
 assert.equal(operationalTable?.UpdateReplacePolicy, "Retain");
 assert.equal(operationalTable?.Properties?.BillingMode, "PAY_PER_REQUEST");
-assert.deepEqual(operationalTable?.Properties?.GlobalSecondaryIndexes?.map((index) => index.IndexName).sort(), ["ByTenantMachine", "ByTenantType"]);
+assert.deepEqual(operationalTable?.Properties?.GlobalSecondaryIndexes?.map((index) => index.IndexName).sort(), ["ByTenantAssignee", "ByTenantMachine", "ByTenantType"]);
 assert.equal(operationalTable?.Properties?.TimeToLiveSpecification?.AttributeName, "expiresAt");
 const anomalyWorkflow = operations.resources.Resources.AnomalyProcessingStateMachine;
 assert.equal(anomalyWorkflow?.Type, "AWS::StepFunctions::StateMachine");
@@ -158,6 +160,11 @@ assert.equal(auraContract.openapi, "3.1.0");
 assert.ok(auraContract.paths?.["/assignments/optimize"]?.post, "AURA optimization contract must exist");
 assert.ok(auraContract.paths?.["/assignments/{assignmentId}/response"]?.post, "AURA human callback response must exist");
 assert.ok(auraContract.paths?.["/inventory/alerts"]?.get, "AURA inventory alert contract must exist");
+assert.ok(auraContract.paths?.["/technician/work-orders"]?.get, "Technician work order self-service contract must exist");
+assert.ok(auraContract.paths?.["/technician/work-orders/{workOrderId}/analysis"]?.post, "Technician assigned analysis contract must exist");
+assert.ok(auraContract.paths?.["/assignments/{assignmentId}/approval"]?.post, "Admin assignment approval contract must exist");
+assert.ok(auraContract.paths?.["/maintenance/orders/{workOrderId}/review"]?.post, "Admin work order review contract must exist");
+assert.ok(auraContract.paths?.["/tenants/{tenantId}/members"]?.post, "Technician membership provisioning contract must exist");
 for (const [name, definition] of Object.entries(aura.functions)) {
   for (const event of definition.events ?? []) {
     const route = event.httpApi;
@@ -167,4 +174,4 @@ for (const [name, definition] of Object.entries(aura.functions)) {
 assert.equal(auraContract.components?.schemas?.Technician?.additionalProperties, false, "AURA technician payload must reject arbitrary tenant fields");
 assert.ok(!JSON.stringify(auraContract).includes("taskToken"), "AURA OpenAPI must not expose callback task tokens");
 
-process.stdout.write("Static checks passed: 7 Serverless stacks, 57 functions, 49 unique routes, retained tenant/operations/AURA tables, external least-privilege role references, JWT routes, separate Supervisor/Operations/AURA Standard workflows and versioned contracts. This is not CloudFormation validation; no AWS call or deployment was made.\n");
+process.stdout.write(`Static checks passed: ${all.length} Serverless stacks, ${functionCount} functions, ${routes.size} unique routes, retained tenant/operations/AURA tables, external least-privilege role references, JWT routes, separate Supervisor/Operations/AURA Standard workflows and versioned contracts. This is not CloudFormation validation; no AWS call or deployment was made.\n`);

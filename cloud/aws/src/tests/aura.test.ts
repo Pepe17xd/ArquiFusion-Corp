@@ -11,6 +11,8 @@ import { LocalTenantDirectory } from "../tenancy/local-tenant-directory";
 import { createRequestAuthorizer } from "../api/request-authorizer";
 import { createAuraHandlers } from "../api/handlers/aura";
 import type { APIGatewayProxyEventV2 } from "aws-lambda";
+import { LocalOperationalRepository } from "../operations/local-repository";
+import { LocalMachineRepository } from "../storage/local-machine-repository";
 
 test("inventory reservation transactions prevent negative stock under concurrent requests", async () => {
   const dir = await mkdtemp(join(tmpdir(), "aura-stock-"));
@@ -96,17 +98,18 @@ test("AURA API derives tenant from Cognito membership and rejects tenantId in re
     const tenants = new LocalTenantDirectory(join(dir, "tenants.json"));
     const tenantA = await tenants.createTenant("subject-a", "Tenant A", "tenant-a-create");
     const tenantB = await tenants.createTenant("subject-b", "Tenant B", "tenant-b-create");
+    await tenants.addTechnicianMember(tenantA.tenant.tenantId, "subject-tech");
     const repo = new LocalAuraRepository(join(dir, "aura.json"));
     const service = new AuraService(repo, {} as never, {} as never);
     const auth = createRequestAuthorizer({ authMode: "cognito", tenants, tokenVerifier: { verify: async (token) => {
-      const sub = token === "token-a" ? "subject-a" : token === "token-b" ? "subject-b" : undefined;
+      const sub = token === "token-a" ? "subject-a" : token === "token-b" ? "subject-b" : token === "token-tech" ? "subject-tech" : undefined;
       if (!sub) throw new Error("invalid token");
       return { sub, scope: "arquifusion/read arquifusion/write", client_id: "test", token_use: "access", iss: "https://issuer.test", exp: Math.floor(Date.now() / 1000) + 600 };
     } } });
     const handlers = createAuraHandlers(service, auth);
     const invoke = (handler: (event: APIGatewayProxyEventV2) => Promise<unknown>, token: string, body?: unknown) => handler({
       version: "2.0", routeKey: "POST /inventory/parts", rawPath: "/inventory/parts", rawQueryString: "",
-      requestContext: { requestId: "test" }, headers: { authorization: `Bearer ${token}`, "x-tenant-id": token === "token-a" ? tenantA.tenant.tenantId : tenantB.tenant.tenantId },
+      requestContext: { requestId: "test" }, headers: { authorization: `Bearer ${token}`, "x-tenant-id": token === "token-b" ? tenantB.tenant.tenantId : tenantA.tenant.tenantId },
       body: body === undefined ? undefined : JSON.stringify(body), pathParameters: {}, queryStringParameters: {}, isBase64Encoded: false,
     } as unknown as APIGatewayProxyEventV2) as Promise<{ statusCode: number; body: string }>;
     const rejected = await invoke(handlers.createPart, "token-a", { tenantId: tenantB.tenant.tenantId, partId: "filter", name: "Filter", sku: "F-1", unit: "each", minimumStock: 1 });
@@ -117,5 +120,116 @@ test("AURA API derives tenant from Cognito membership and rejects tenantId in re
     assert.equal(await repo.get(tenantB.tenant.tenantId, "PART", "filter"), undefined);
     const listed = await invoke(handlers.parts, "token-b");
     assert.deepEqual(JSON.parse(listed.body).data.items, []);
+    const technicianTenantWideRead = await invoke(handlers.parts, "token-tech");
+    assert.equal(technicianTenantWideRead.statusCode, 403);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("technician work orders are isolated by linked Cognito subject and admin approval closes the incident", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "aura-technician-workflow-"));
+  try {
+    const tenantId = "tenant-a", now = new Date().toISOString();
+    const aura = new LocalAuraRepository(join(dir, "aura.json"));
+    const operations = new LocalOperationalRepository(join(dir, "operations.json"));
+    const machines = new LocalMachineRepository(join(dir, "machines.json"));
+    await aura.save({ tenantId, entityType: "TECHNICIAN", entityId: "tech-1", technicianId: "tech-1", cognitoSub: "subject-tech-1", displayName: "Tech 1", status: "active", createdAt: now, updatedAt: now, version: 1 }, null);
+    await operations.save({ tenantId, entityType: "INCIDENT", entityId: "incident-1", machineId: "machine-1", status: "assigned", createdAt: now, updatedAt: now, version: 1, history: [{ status: "assigned", at: now }] }, null);
+    await operations.save({ tenantId, entityType: "WORK_ORDER", entityId: "order-1", incidentId: "incident-1", machineId: "machine-1", assignedTechnicianId: "tech-1", status: "assigned", createdAt: now, updatedAt: now, version: 1, history: [] }, null);
+    await operations.save({ tenantId, entityType: "WORK_ORDER", entityId: "order-other-tech", incidentId: "incident-1", machineId: "machine-1", assignedTechnicianId: "tech-2", status: "assigned", createdAt: now, updatedAt: now, version: 1, history: [] }, null);
+    await operations.save({ tenantId, entityType: "WORK_ORDER", entityId: "order-2", incidentId: "incident-1", machineId: "machine-2", assignedTechnicianId: "tech-1", status: "assigned", createdAt: now, updatedAt: now, version: 1, history: [] }, null);
+    const service = new AuraService(aura, operations, machines);
+    const own = await service.technicianWorkOrders(tenantId, "subject-tech-1", 10);
+    assert.deepEqual(own.items.map((item) => item.entityId).sort(), ["order-1", "order-2"]);
+    const page1 = await service.technicianWorkOrders(tenantId, "subject-tech-1", 1);
+    assert.equal(page1.items.length, 1);
+    assert.ok(page1.nextCursor);
+    const page2 = await service.technicianWorkOrders(tenantId, "subject-tech-1", 1, page1.nextCursor);
+    assert.equal(page2.items.length, 1);
+    assert.notEqual(page1.items[0].entityId, page2.items[0].entityId);
+    await assert.rejects(service.technicianWorkOrders(tenantId, "subject-other", 10), /not linked/);
+    await service.updateTechnicianWorkOrder(tenantId, "subject-tech-1", "order-1", { action: "start" });
+    await service.completeTechnicianWorkOrder(tenantId, "subject-tech-1", "order-1", "Replaced and tested the hydraulic filter");
+    const completed = await operations.get(tenantId, "WORK_ORDER", "order-1");
+    assert.equal(completed?.status, "completed");
+    assert.equal((completed?.history as Array<Record<string, unknown>>).at(-1)?.actorRole, "technician");
+    assert.equal((await operations.get(tenantId, "INCIDENT", "incident-1"))?.status, "in_progress", "technician completion must not close the incident");
+    await service.reviewWorkOrder(tenantId, "subject-admin", "order-1", "approve", "Reviewed work and verified machine operation");
+    assert.equal((await operations.get(tenantId, "WORK_ORDER", "order-1"))?.status, "approved");
+    assert.equal((await operations.get(tenantId, "INCIDENT", "incident-1"))?.status, "closed");
+    const events = await operations.queryByType(tenantId, "EVENT", 20);
+    assert.ok(events.items.some((item) => item.eventType === "MaintenanceApproved"));
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("Cognito technician invitations persist subject linkage and replay idempotently", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "aura-tech-invite-"));
+  try {
+    const aura = new LocalAuraRepository(join(dir, "aura.json"));
+    const operations = new LocalOperationalRepository(join(dir, "operations.json"));
+    const machines = new LocalMachineRepository(join(dir, "machines.json"));
+    const tenants = new LocalTenantDirectory(join(dir, "tenants.json"));
+    const tenantId = (await tenants.listForUser("local-dev-user"))[0].tenant.tenantId;
+    let invitations = 0;
+    const identity = { invite: async (email: string) => { invitations += 1; assert.equal(email, "tech@example.test"); return { userSub: "cognito-created-sub" }; }, disable: async () => undefined };
+    const service = new AuraService(aura, operations, machines, undefined, undefined, undefined, identity, tenants);
+    const profile = { technicianId: "tech-demo-1", displayName: "Demo Technician", specialties: ["hydraulics"], skills: [{ code: "hydraulic-diagnostics", level: 3 }], availability: "available", maxConcurrentAssignments: 2, shifts: [{ daysOfWeek: [1, 2, 3, 4, 5], startTime: "08:00", endTime: "17:00", timeZone: "America/Lima" }], email: "tech@example.test" };
+    const created = await service.inviteTechnician(tenantId, profile, "invite-key-0001");
+    const replay = await service.inviteTechnician(tenantId, profile, "invite-key-0001");
+    assert.equal(created.userSub, "cognito-created-sub");
+    assert.equal(created.technician.cognitoSub, "cognito-created-sub");
+    assert.equal(replay.replayed, true);
+    assert.equal(invitations, 1);
+    assert.equal((await tenants.resolve("cognito-created-sub", tenantId)).role, "technician");
+    await assert.rejects(service.inviteTechnician(tenantId, { ...profile, displayName: "Changed" }, "invite-key-0001"), /different technician invitation/);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("approving an AURA recommendation creates or links the technician-assigned maintenance order", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "aura-assigned-order-"));
+  try {
+    const tenantId = "tenant-assignment", now = new Date().toISOString();
+    const aura = new LocalAuraRepository(join(dir, "aura.json"));
+    const operations = new LocalOperationalRepository(join(dir, "operations.json"));
+    const machines = new LocalMachineRepository(join(dir, "machines.json"));
+    await aura.save({ tenantId, entityType: "TECHNICIAN", entityId: "tech-assigned", technicianId: "tech-assigned", cognitoSub: "subject-tech", displayName: "Technician", specialties: ["hydraulics"], skills: [{ code: "hydraulic-diagnostics", level: 3 }], availability: "available", maxConcurrentAssignments: 2, status: "active", shifts: [{ daysOfWeek: [0, 1, 2, 3, 4, 5, 6], startTime: "00:00", endTime: "23:59", timeZone: "UTC" }], createdAt: now, updatedAt: now, version: 1 }, null);
+    await operations.save({ tenantId, entityType: "INCIDENT", entityId: "incident-aura", machineId: "machine-aura", severity: "warning", status: "open", createdAt: now, updatedAt: now, version: 1, history: [] }, null);
+    await aura.save({ tenantId, entityType: "ASSIGNMENT", entityId: "assignment-aura", assignmentId: "assignment-aura", incidentId: "incident-aura", machineId: "machine-aura", technicianId: "tech-assigned", status: "proposed", version: 1, candidates: [{ technicianId: "tech-assigned", cost: 0.2, breakdown: { skill: 0.2 } }], cost: 0.2, costBreakdown: { skill: 0.2 }, createdAt: now, updatedAt: now }, null);
+    const service = new AuraService(aura, operations, machines);
+    const response = await service.approveAssignment(tenantId, "subject-admin", "assignment-aura", "tech-assigned", 1, "assignment-approval-key");
+    assert.equal(response.workflowStarted, false);
+    const orders = await operations.queryByType(tenantId, "WORK_ORDER", 10);
+    assert.equal(orders.items.length, 1);
+    assert.equal(orders.items[0].assignedTechnicianId, "tech-assigned");
+    assert.equal(orders.items[0].incidentId, "incident-aura");
+    const incident = await operations.get(tenantId, "INCIDENT", "incident-aura");
+    assert.equal(incident?.workOrderId, orders.items[0].entityId);
+  } finally { await rm(dir, { recursive: true, force: true }); }
+});
+
+test("audit filters are applied before cursor pagination and cursors are bound to the filter set", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "aura-audit-filters-"));
+  try {
+    const aura = new LocalAuraRepository(join(dir, "aura.json"));
+    const operations = new LocalOperationalRepository(join(dir, "operations.json"));
+    const machines = new LocalMachineRepository(join(dir, "machines.json"));
+    const service = new AuraService(aura, operations, machines);
+    const start = Date.now() - 10_000;
+    for (let index = 0; index < 7; index += 1) {
+      const eventType = index % 2 ? "MaintenanceUpdated" : "MaintenanceFailed";
+      const createdAt = new Date(start + index * 1000).toISOString();
+      await aura.save({ tenantId: "tenant-audit", entityType: "EVENT", entityId: `event-${index}`, eventId: `event-${index}`, eventType, resourceId: `order-${index}`, status: index === 5 ? "failed" : "completed", payload: { errorCode: index === 5 ? "UPDATE_FAILED" : undefined }, createdAt, updatedAt: createdAt }, null);
+    }
+    const filters = { from: new Date(start + 2000).toISOString(), to: new Date(start + 6000).toISOString(), eventType: "MaintenanceUpdated", error: true };
+    const first = await service.listEvents("tenant-audit", filters, 1);
+    assert.equal(first.items.length, 1);
+    assert.equal(first.items[0].entityId, "event-5");
+    assert.ok(first.nextCursor);
+    const filteredRemainder = await service.listEvents("tenant-audit", filters, 1, first.nextCursor);
+    assert.deepEqual(filteredRemainder.items, []);
+    assert.equal(filteredRemainder.nextCursor, undefined);
+    const broad = await service.listEvents("tenant-audit", { error: false }, 2);
+    assert.equal(broad.items.length, 2);
+    assert.ok(broad.nextCursor);
+    await assert.rejects(service.listEvents("tenant-audit", { error: true }, 2, broad.nextCursor), /Validation failed/);
   } finally { await rm(dir, { recursive: true, force: true }); }
 });

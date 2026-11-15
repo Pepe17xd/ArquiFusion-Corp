@@ -3,22 +3,37 @@ import { SFNClient, SendTaskSuccessCommand } from "@aws-sdk/client-sfn";
 import { AuraService } from "../../aura/service";
 import { createAuraHandlers } from "../handlers/aura";
 import { createDomainRuntime } from "./runtime";
+import { OperationsService } from "../../operations/service";
+import { createIntelligenceProvider } from "../../intelligence/factory";
+import { AwsCognitoUserAdmin } from "../../security/cognito-user-admin";
 
 let handlers: ReturnType<typeof createHandlers> | undefined;
 function createHandlers() {
   const runtime = createDomainRuntime("aura");
   const sfn = new SFNClient({});
-  const service = new AuraService(runtime.aura(), runtime.operations(), runtime.machines(), runtime.auraWorkflow(), { succeed: async (taskToken, result) => { await sfn.send(new SendTaskSuccessCommand({ taskToken, output: JSON.stringify(result) })); } });
+  const operations = new OperationsService(runtime.operations(), runtime.machines(), undefined, createIntelligenceProvider());
+  const cognitoAdmin = process.env.COGNITO_USER_POOL_ID ? new AwsCognitoUserAdmin(process.env.COGNITO_USER_POOL_ID) : undefined;
+  const service = new AuraService(runtime.aura(), runtime.operations(), runtime.machines(), runtime.auraWorkflow(), { succeed: async (taskToken, result) => { await sfn.send(new SendTaskSuccessCommand({ taskToken, output: JSON.stringify(result) })); } }, (tenantId, anomalyId) => operations.explainAnomaly(tenantId, anomalyId), cognitoAdmin, runtime.tenants);
   return createAuraHandlers(service, runtime.auth);
 }
 function getHandlers() { return handlers ??= createHandlers(); }
 export const technicians = (event: APIGatewayProxyEventV2) => getHandlers().technicians(event);
+export const technicianMe = (event: APIGatewayProxyEventV2) => getHandlers().technicianMe(event);
+export const technicianWorkOrders = (event: APIGatewayProxyEventV2) => getHandlers().technicianWorkOrders(event);
+export const technicianWorkOrderAnalysis = (event: APIGatewayProxyEventV2) => getHandlers().technicianWorkOrderAnalysis(event);
+export const technicianStartWorkOrder = (event: APIGatewayProxyEventV2) => getHandlers().technicianStartWorkOrder(event);
+export const technicianBlockWorkOrder = (event: APIGatewayProxyEventV2) => getHandlers().technicianBlockWorkOrder(event);
+export const technicianCompleteWorkOrder = (event: APIGatewayProxyEventV2) => getHandlers().technicianCompleteWorkOrder(event);
+export const technicianReservePart = (event: APIGatewayProxyEventV2) => getHandlers().technicianReservePart(event);
+export const technicianConsumeReservation = (event: APIGatewayProxyEventV2) => getHandlers().technicianConsumeReservation(event);
 export const saveTechnician = (event: APIGatewayProxyEventV2) => getHandlers().saveTechnician(event);
+export const inviteTechnician = (event: APIGatewayProxyEventV2) => getHandlers().inviteTechnician(event);
+export const archiveTechnician = (event: APIGatewayProxyEventV2) => getHandlers().updateTechnician(event);
 export const getTechnician = (event: APIGatewayProxyEventV2) => getHandlers().getTechnician(event);
-export const archiveTechnician = (event: APIGatewayProxyEventV2) => getHandlers().archiveTechnician(event);
 export const putMachineCoordinates = (event: APIGatewayProxyEventV2) => getHandlers().putMachineCoordinates(event);
 export const parts = (event: APIGatewayProxyEventV2) => getHandlers().parts(event);
 export const createPart = (event: APIGatewayProxyEventV2) => getHandlers().createPart(event);
+export const updatePart = (event: APIGatewayProxyEventV2) => getHandlers().updatePart(event);
 export const stock = (event: APIGatewayProxyEventV2) => getHandlers().stock(event);
 export const inventoryAlerts = (event: APIGatewayProxyEventV2) => getHandlers().inventoryAlerts(event);
 export const movements = (event: APIGatewayProxyEventV2) => getHandlers().movements(event);
@@ -29,6 +44,8 @@ export const optimize = (event: APIGatewayProxyEventV2) => getHandlers().optimiz
 export const assignments = (event: APIGatewayProxyEventV2) => getHandlers().assignments(event);
 export const assignment = (event: APIGatewayProxyEventV2) => getHandlers().assignment(event);
 export const assignmentResponse = (event: APIGatewayProxyEventV2) => getHandlers().assignmentResponse(event);
+export const approveAssignment = (event: APIGatewayProxyEventV2) => getHandlers().approveAssignment(event);
+export const reviewWorkOrder = (event: APIGatewayProxyEventV2) => getHandlers().reviewWorkOrder(event);
 export const intervention = (event: APIGatewayProxyEventV2) => getHandlers().intervention(event);
 export const policy = (event: APIGatewayProxyEventV2) => getHandlers().policy(event);
 export const savePolicy = (event: APIGatewayProxyEventV2) => getHandlers().savePolicy(event);

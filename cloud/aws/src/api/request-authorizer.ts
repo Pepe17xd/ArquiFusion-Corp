@@ -24,6 +24,7 @@ export function createRequestAuthorizer(input: {
     try {
       const claims = await input.tokenVerifier.verify(token);
       if (!claims.scope.split(/\s+/).includes(scope)) throw new TenantAccessError();
+      await input.tenants.assertUserActive(claims.sub);
       return claims.sub;
     } catch (error) {
       if (error instanceof TenantAccessError) throw error;
@@ -36,7 +37,11 @@ export function createRequestAuthorizer(input: {
     const requestedTenantId = Object.entries(event.headers ?? {}).find(([key]) => key.toLowerCase() === "x-tenant-id")?.[1];
     const resolved = await input.tenants.resolve(userSub, typeof requestedTenantId === "string" && requestedTenantId ? requestedTenantId : undefined);
     telemetry.tenantId = resolved.tenantId;
-    const roleLevel: Record<TenantRole, number> = { viewer: 0, operator: 1, admin: 2, owner: 3 };
+    // Technician memberships are deliberately isolated from tenant-wide APIs.
+    // A technician must use handlers that also prove assignment ownership.
+    if (resolved.role === "technician" && requiredRole !== "technician") throw new TenantAccessError();
+    if (requiredRole === "technician" && resolved.role !== "technician") throw new TenantAccessError();
+    const roleLevel: Record<TenantRole, number> = { viewer: 0, technician: 1, operator: 1, admin: 2, owner: 3 };
     if (!(resolved.role in roleLevel) || roleLevel[resolved.role] < roleLevel[requiredRole]) throw new TenantAccessError();
     return resolved;
   }
