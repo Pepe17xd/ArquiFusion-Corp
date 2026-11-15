@@ -1,0 +1,37 @@
+{
+  "simulation_notice": "SIMULATED HACKATHON FIXTURE — not manufacturer data or production telemetry",
+  "tenantId": "demo-maintenance",
+  "assessedAt": "2026-10-15T12:00:00.000Z",
+  "machines": [
+    { "machineId": "SIM-OPER-01", "model": "Demo Hauler X", "category": "hauler", "location": "Sector A", "status": "operational", "operatingHours": 1200, "temperature": 72, "vibration": 3, "pressure": 210, "fuelConsumption": 22 },
+    { "machineId": "SIM-TEMP-02", "model": "Demo Hauler X", "category": "hauler", "location": "Sector B", "status": "operational", "operatingHours": 1600, "temperature": 96, "vibration": 3, "pressure": 210, "fuelConsumption": 22 },
+    { "machineId": "SIM-VIB-03", "model": "Demo Hauler X", "category": "hauler", "location": "Sector C", "status": "operational", "operatingHours": 1700, "temperature": 72, "vibration": 12, "pressure": 210, "fuelConsumption": 22 },
+    { "machineId": "SIM-MULTI-04", "model": "Demo Hauler X", "category": "hauler", "location": "Sector D", "status": "operational", "operatingHours": 8100, "temperature": 101, "vibration": 13, "pressure": 330, "fuelConsumption": 41 },
+    { "machineId": "SIM-DUE-05", "model": "Demo Hauler X", "category": "hauler", "location": "Sector E", "status": "operational", "operatingHours": 1900, "temperature": 70, "vibration": 2, "pressure": 205, "fuelConsumption": 18 },
+    { "machineId": "SIM-OVERDUE-06", "model": "Demo Hauler X", "category": "hauler", "location": "Sector F", "status": "operational", "operatingHours": 2300, "temperature": 74, "vibration": 3, "pressure": 220, "fuelConsumption": 21 },
+    { "machineId": "SIM-LOWDATA-07", "model": "Demo Hauler X", "category": "hauler", "location": "Sector G", "status": "operational" }
+  ],
+  "maintenanceHistory": [
+    { "tenantId": "demo-maintenance", "machineId": "SIM-DUE-05", "maintainedAt": "2026-08-01T12:00:00.000Z", "operatingHoursAtMaintenance": 1000, "intervalHours": 1000 },
+    { "tenantId": "demo-maintenance", "machineId": "SIM-OVERDUE-06", "maintainedAt": "2026-06-01T12:00:00.000Z", "operatingHoursAtMaintenance": 1400, "intervalHours": 800 }
+  ],
+  "readings": [
+    { "tenantId": "demo-maintenance", "machineId": "SIM-OPER-01", "timestamp": "2026-10-15T11:00:00.000Z", "temperature": 72, "vibration": 3 },
+    { "tenantId": "demo-maintenance", "machineId": "SIM-TEMP-02", "timestamp": "2026-10-15T11:00:00.000Z", "temperature": 96, "vibration": 3 },
+    { "tenantId": "demo-maintenance", "machineId": "SIM-VIB-03", "timestamp": "2026-10-15T11:00:00.000Z", "temperature": 72, "vibration": 12 }
+  ],
+  "demoRules": [
+    {
+      "category": "hauler",
+      "ranges": {
+        "temperature": { "max": 90 },
+        "vibration": { "max": 8 },
+        "pressure": { "min": 100, "max": 300 },
+        "fuelConsumption": { "max": 35 }
+      },
+      "operatingHoursHigh": 8000,
+      "maintenanceDueSoonHours": 150,
+      "combined": [{ "metrics": ["temperature", "vibration", "pressure", "fuelConsumption"], "minSignals": 2, "severity": "CRITICAL", "label": "multiple-demo-thresholds" }]
+    }
+  ]
+}

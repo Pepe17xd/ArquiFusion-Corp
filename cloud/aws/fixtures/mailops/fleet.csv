@@ -1,0 +1,3 @@
+machineId,model,category,location,status,temperature
+EQ-001,Modelo A,Excavadora,Mina,alert,95
+EQ-002,Modelo B,Camión,Mina,operational,70

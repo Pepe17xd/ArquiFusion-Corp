@@ -1,0 +1,4 @@
+[
+  {"machineId":"EQ-001","model":"Modelo A","category":"Excavadora","location":"Mina","status":"alert","temperature":95},
+  {"machineId":"EQ-002","model":"Modelo B","category":"Camión","location":"Mina","status":"operational","temperature":70}
+]
