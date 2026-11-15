@@ -29,8 +29,8 @@ export function FleetView({ machines, metrics, loading, fleetError, search, setS
           <label><span>Categoría</span><select value={category} onChange={(event) => setCategory(event.target.value)}><option value="">Todas las categorías</option>{categories.map((value) => <option key={value}>{value}</option>)}</select><ChevronDown size={13}/></label>
         </div>
       </div>
-      {fleetError && !loading ? <div className="table-message" role="alert">No se pudieron cargar los registros de flota. Actualiza para reintentar.</div> : <MachineTable machines={page.items} loading={loading} onOpen={onOpenMachine}/>}
-      <div className="pagination"><div><span>Paginación del cliente · {fleetError ? "Total no disponible" : `${page.total} registros coincidentes`} · página {page.page} de {page.pages} · {page.items.length} visibles</span><label>Registros por página <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[5, 10, 20].map(size => <option key={size} value={size}>{size}</option>)}</select></label></div><div>
+      {fleetError && !loading ? <div className="table-message" role="alert">No pudimos cargar la flota. Usa Actualizar para volver a intentarlo.</div> : <MachineTable machines={page.items} loading={loading} onOpen={onOpenMachine}/>}
+      <div className="pagination"><div><span>{fleetError ? "Total no disponible" : `${page.total} registros`} · página {page.page} de {page.pages} · {page.items.length} visibles</span><label>Registros por página <select value={pageSize} onChange={event => setPageSize(Number(event.target.value))}>{[5, 10, 20].map(size => <option key={size} value={size}>{size}</option>)}</select></label></div><div>
         <button className="button button-secondary" disabled={page.page <= 1 || loading} onClick={() => setPageNumber(page.page - 1)}><ArrowLeft size={14}/> Anterior</button>
         <button className="button button-secondary" disabled={page.page >= page.pages || loading} onClick={() => setPageNumber(page.page + 1)}>Siguiente <ArrowRight size={14}/></button>
       </div></div>
@@ -47,7 +47,7 @@ export function MachineTable({ machines, loading, onOpen, title, action }: {
       <tbody>{machines.map((machine) => <tr key={machine.machineId} tabIndex={0} onClick={() => onOpen(machine.machineId)} onKeyDown={(event) => event.key === "Enter" && onOpen(machine.machineId)}>
         <td><span className="machine-id">{machine.machineId}<small>{machine.model}</small></span></td><td>{machine.category}</td><td>{machine.location}</td><td><MachineStatusBadge status={machine.status}/></td><td>{machine.operatingHours ?? "—"}</td><td>{formatTimestamp(machine.updatedAt, true)}</td>
       </tr>)}</tbody></table>
-      {loading && <div className="table-message">Cargando registros de flota…</div>}{!loading && !machines.length && <div className="table-message">Ninguna máquina coincide con esta vista.</div>}
+      {loading && <div className="table-message">Cargando flota…</div>}{!loading && !machines.length && <div className="table-message">Todavía no hay equipos para mostrar.</div>}
     </div>
   </section>;
 }

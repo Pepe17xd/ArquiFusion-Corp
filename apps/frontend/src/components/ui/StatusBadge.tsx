@@ -16,8 +16,3 @@ export function AgentStatusBadge({ planned = false }: { planned?: boolean }) {
     ? <span className="status-badge planned"><Clock3 size={12}/>Planificado</span>
     : <span className="status-badge active"><span className="status-dot"/>Operativo</span>;
 }
-
-export function ConnectionBadge({ connected, checking }: { connected: boolean; checking: boolean }) {
-  const label = checking ? "Comprobando API" : connected ? "API conectada" : "API sin conexión";
-  return <span className={"connection-badge " + (connected ? "online" : checking ? "checking" : "offline")}><span className="status-dot"/>{label}</span>;
-}

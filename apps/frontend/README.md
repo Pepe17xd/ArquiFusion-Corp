@@ -30,6 +30,12 @@ Para desplegar, crea un proyecto Pages en Cloudflare, conecta el repositorio, us
 
 Para el proyecto Pages de producción define `VITE_API_URL`, `VITE_AUTH_MODE=cognito`, `VITE_COGNITO_CLIENT_ID`, `VITE_COGNITO_DOMAIN` y `VITE_COGNITO_REDIRECT_URI=https://arquifusion-corp.pages.dev/auth/callback` en **Settings → Variables and Secrets → Variables de entorno** y vuelve a ejecutar el build después de guardarlas. El ID de cliente y el dominio Hosted UI son configuración pública; las claves privadas y secretos no son variables `VITE_*`. Registra también las URL de callback y logout exactas en Cognito.
 
+El cliente actual consume `VITE_API_URL` (no `VITE_API_BASE_URL`) y Cognito Hosted UI consume el client ID, el dominio y la URL de callback. La región y el User Pool ID no son leídos por el frontend OAuth actual. Se conservaron los nombres ya usados por el código; no añadas variables con secretos ni valores privados al build de Pages.
+
+## Sistema visual Enterprise 2.0
+
+Los tokens y reglas compartidas están en `src/design-system.css`: paleta industrial grafito/rojo, tipografía, espaciado, radios, sombras, controles de formulario, focos accesibles y breakpoints. La landing y el acceso usan `mine-hero.jpg`, con atribución y licencia documentadas en `public/PHOTO-CREDITS.md`; el centro de mando utiliza esa misma fotografía como detalle visual atenuado para mantener legible la interfaz operativa. No se agregan cifras de demostración a la landing.
+
 
 ## Cierre de sesión Cognito
 

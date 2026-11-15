@@ -13,7 +13,7 @@ test("pagination uses the filtered records and clamps page boundaries", () => {
 test("critical pagination and operational module copy is valid UTF-8", () => {
   const readUtf8 = (path: string) => new TextDecoder("utf-8", { fatal: true }).decode(readFileSync(new URL(path, import.meta.url)));
   const fleet = readUtf8("./FleetView.tsx");
-  assert.match(fleet, /Paginación del cliente ·/u);
+  assert.match(fleet, /registros.*página/u);
   assert.match(fleet, /· página \{page\.page\} de \{page\.pages\}/u);
   assert.match(fleet, /Registros por página/u);
   assert.match(fleet, /Buscar por ID, modelo o ubicación/u);

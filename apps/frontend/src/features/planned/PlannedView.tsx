@@ -12,5 +12,5 @@ export function PlannedView({ view, description }: { view: AppView; description:
   const module = plannedModules[view];
   if (!module) return null;
   const Icon = module.icon;
-  return <section className="panel planned-module"><span className="planned-module-icon"><Icon size={22}/></span><span className="status-badge planned">PLANIFICADO</span><h2>{module.title}</h2><p>{description}</p><p className="planned-explainer">Este espacio está reservado para el módulo operacional. Se incorporarán controles cuando existan los contratos del backend y la persistencia correspondiente.</p></section>;
+  return <section className="panel planned-module"><span className="planned-module-icon"><Icon size={22}/></span><span className="status-badge planned">PLANIFICADO</span><h2>{module.title}</h2><p>{description}</p><p className="planned-explainer">Este espacio está reservado para el módulo operacional. Se incorporarán controles cuando existan las funciones y los datos correspondientes.</p></section>;
 }

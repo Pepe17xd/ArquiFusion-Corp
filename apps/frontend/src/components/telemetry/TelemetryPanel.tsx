@@ -20,7 +20,7 @@ export function TelemetryPanel({ machines, total, loading }: { machines: Machine
   return (
     <section className="panel telemetry-panel">
       <div className="panel-heading">
-        <div><div className="eyebrow">TELEMETRÍA DE API / LECTURAS ACTUALES</div><h2>Resumen de señales</h2><p>Promedio de los registros cargados · no hay series históricas</p></div>
+        <div><div className="eyebrow">TELEMETRÍA / LECTURAS ACTUALES</div><h2>Resumen de señales</h2><p>Promedio de los registros cargados · no hay series históricas</p></div>
         <span className="sample-label">{machines.length} / {total} cargadas</span>
       </div>
       {loading ? <div className="telemetry-grid">{signals.map((signal) => <div className="telemetry-card" key={signal.key}><Skeleton className="skeleton-number"/></div>)}</div>
@@ -32,7 +32,7 @@ export function TelemetryPanel({ machines, total, loading }: { machines: Machine
             <div className="coverage-track" role="img" aria-label={observed + " de " + machines.length + " registros contienen " + label}><i style={{ width: machines.length ? ((observed / machines.length) * 100) + "%" : "0%" }}/></div>
           </article>
         ))}</div>}
-      <div className="telemetry-footnote"><span className="info-glyph">i</span> El contrato de origen no define unidades de telemetría. La cobertura indica registros con valor, no el estado del sensor.</div>
+      <div className="telemetry-footnote"><span className="info-glyph">i</span> Los registros de origen no especifican unidades de telemetría. La cobertura indica registros con valor, no el estado del sensor.</div>
     </section>
   );
 }

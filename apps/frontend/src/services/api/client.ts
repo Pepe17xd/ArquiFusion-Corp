@@ -73,11 +73,13 @@ export interface OperationalItem { entityId: string; entityType: string; machine
 export interface AuraTechnician { technicianId: string; displayName: string; availability: "available" | "unavailable"; specialties: string[]; skills: Array<{ code: string; level: number }>; maxConcurrentAssignments: number; status?: string; shifts?: Array<{ daysOfWeek: number[]; startTime: string; endTime: string; timeZone: string }>; coordinates?: { latitude: number; longitude: number; datum: "WGS84" }; version: number }
 export interface InventoryPart { partId: string; name: string; sku: string; unit: string; minimumStock: number; status: string; version: number }
 export interface InventoryBalance { stockId: string; partId: string; locationId: string; onHand: number; reserved: number; version: number }
+export interface InventoryMovement extends OperationalItem { movementId: string; partId: string; locationId: string; kind: "receipt" | "adjustment" | string; quantity: number; reason: string }
 export interface AuraAssignment { assignmentId: string; incidentId: string; machineId: string; technicianId: string | null; status: string; severity: string; cost: number; costBreakdown: Record<string, number>; distanceKm?: number }
 export interface TechnicianWorkOrder extends OperationalItem { incidentId: string; assignedTechnicianId: string; partsUsed?: Array<{ reservationId: string; partId: string; locationId: string; quantity: number; consumedAt?: string }>; reservations?: Array<{ reservationId: string; partId: string; locationId: string; quantity: number; status: string }>; incident?: OperationalItem | null; machine?: Machine | null }
 export interface AuraKpis { period: { from: string; to: string }; mttr: { averageMinutes: number | null; resolvedIncidentCount: number }; downtime: { totalMinutes: number | null; reason: string }; recurrence: { windowDays: number; recurrentIncidentCount: number; incidentCount: number; percent: number | null }; responseSla: { responseSlaMinutes: number | null; acknowledgedCount: number; withinSlaCount: number; compliancePercent: number | null } }
 
 import { accessToken, authMode, selectedTenantId, expireSession, type TenantChoice } from "../auth/session";
+import { isLocalPreview } from "../runtime-mode";
 
 const apiBase = (import.meta.env.VITE_API_URL || (import.meta.env.DEV ? "/api" : "https://ep40dq915l.execute-api.us-east-1.amazonaws.com")).replace(/\/$/, "");
 
@@ -86,6 +88,7 @@ export class ApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  if (isLocalPreview) throw new ApiError("local-preview", 0);
   let response: Response | undefined;
   const safeGet = (init?.method ?? "GET").toUpperCase() === "GET";
   for (let attempt = 0; attempt < (safeGet ? 3 : 1); attempt += 1) {
@@ -157,6 +160,7 @@ export const auraApi = {
   parts: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<InventoryPart>>("/inventory/parts?" + query.toString()),
   stock: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<InventoryBalance>>("/inventory/stock?" + query.toString()),
   inventoryAlerts: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<Record<string, unknown>>>("/inventory/alerts?" + query.toString()),
+  movements: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<InventoryMovement>>("/inventory/movements?" + query.toString()),
   assignments: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<AuraAssignment>>("/assignments?" + query.toString()),
   events: (query = new URLSearchParams({ limit: "100" })) => request<ApiPage<OperationalItem>>("/aura/events?" + query.toString()),
   kpis: (from: string, to: string) => request<AuraKpis>("/operations/kpis?" + new URLSearchParams({ from, to }).toString()),

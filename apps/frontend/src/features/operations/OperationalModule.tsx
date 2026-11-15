@@ -1,13 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { FormEvent, ReactNode } from "react";
 import { Activity, AlertTriangle, ArrowRight, Check, Circle, Clock3, RefreshCw, Sparkles, Wrench } from "lucide-react";
-import { auraApi, operationsApi, type ApiPage, type AuraAssignment, type AuraKpis, type AuraTechnician, type InventoryBalance, type InventoryPart, type OperationalItem, type TechnicianWorkOrder } from "../../services/api/client";
+import { auraApi, fleetApi, operationsApi, type ApiPage, type AuraAssignment, type AuraKpis, type AuraTechnician, type InventoryBalance, type InventoryMovement, type InventoryPart, type Machine, type OperationalItem, type TechnicianWorkOrder } from "../../services/api/client";
 import { selectedTenantId } from "../../services/auth/session";
 import type { AppView } from "../../components/navigation/NavigationRail";
-import { moduleLoadState, moduleUnavailable } from "./module-state";
+import { FormSection, TextAreaField } from "../../components/ui/DesignPrimitives";
+import { DataTable as Table } from "../../components/ui/DataTable";
+import { moduleLoadState } from "./module-state";
+import { toUserMessage } from "../../services/api/user-message";
+import { toEventLabel } from "../../services/api/user-copy";
+import { isLocalPreview } from "../../services/runtime-mode";
 
 type ProposedAssignment = AuraAssignment & { candidates?: Array<{ technicianId: string; cost: number; breakdown: Record<string, number> }>; version?: number };
-type Data = { incidents?: ApiPage<OperationalItem>; anomalies?: ApiPage<OperationalItem>; orders?: ApiPage<OperationalItem>; technicians?: ApiPage<AuraTechnician>; parts?: ApiPage<InventoryPart>; stock?: ApiPage<InventoryBalance>; alerts?: ApiPage<Record<string, unknown>>; assignments?: ApiPage<AuraAssignment>; events?: ApiPage<OperationalItem>; kpis?: AuraKpis; profile?: AuraTechnician; myOrders?: ApiPage<TechnicianWorkOrder> };
+type Data = { incidents?: ApiPage<OperationalItem>; anomalies?: ApiPage<OperationalItem>; orders?: ApiPage<OperationalItem>; technicians?: ApiPage<AuraTechnician>; parts?: ApiPage<InventoryPart>; stock?: ApiPage<InventoryBalance>; alerts?: ApiPage<Record<string, unknown>>; movements?: ApiPage<InventoryMovement>; assignments?: ApiPage<AuraAssignment>; events?: ApiPage<OperationalItem>; kpis?: AuraKpis; profile?: AuraTechnician; myOrders?: ApiPage<TechnicianWorkOrder>; machines?: Machine[] };
 type Analysis = { source: string; recommendations: Array<{ title: string; reason: string; suggestedAction: string }>; evidence: Record<string, unknown> | null; explanationAvailable?: boolean };
 const technicianViews = new Set<AppView>(["myPanel", "myAssignments", "myMachines", "myMaintenance", "myParts", "myHistory"]);
 const titles: Partial<Record<AppView, string>> = { maintenance: "Órdenes de mantenimiento", inventory: "Inventario y disponibilidad", technicians: "Equipo técnico", incidents: "Incidentes activos", orchestration: "Coordinación AURA", myPanel: "Mi panel técnico", myAssignments: "Mis asignaciones", myMachines: "Máquinas de mis trabajos", myMaintenance: "Mis mantenimientos", myParts: "Repuestos solicitados", myHistory: "Mi historial" };
@@ -42,6 +47,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
   const isTechnician = role === "technician" && technicianViews.has(view);
 
   const load = useCallback(async () => {
+    if (isLocalPreview) { setData({}); setLoading(false); setError(""); setNotice(""); return; }
     setLoading(true); setError(""); setNotice("");
     try {
       let next: Data;
@@ -50,12 +56,18 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
         next = { profile, myOrders };
       } else if (view === "incidents") {
         const [incidents, anomalies] = await Promise.all([operationsApi.incidents(), operationsApi.anomalies()]);
-        next = { incidents, anomalies };
+        const machines: Machine[] = []; const cursors = new Set<string>(); let cursor: string | undefined;
+        do {
+          const params = new URLSearchParams({ limit: "100" }); if (cursor) params.set("cursor", cursor);
+          const page = await fleetApi.machines(params); machines.push(...page.items); cursor = page.nextCursor;
+          if (cursor && cursors.has(cursor)) throw new Error("No pudimos actualizar la flota."); if (cursor) cursors.add(cursor);
+        } while (cursor);
+        next = { incidents, anomalies, machines };
       } else if (view === "maintenance") next = { orders: await operationsApi.maintenance() };
       else if (view === "technicians") next = { technicians: await auraApi.technicians() };
       else if (view === "inventory") {
-        const values = await Promise.all([auraApi.parts(), auraApi.stock(), auraApi.inventoryAlerts()]);
-        next = { parts: values[0], stock: values[1], alerts: values[2] };
+        const values = await Promise.all([auraApi.parts(), auraApi.stock(), auraApi.inventoryAlerts(), auraApi.movements()]);
+        next = { parts: values[0], stock: values[1], alerts: values[2], movements: values[3] };
       } else if (view === "orchestration") {
         const to = new Date(), from = new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
         const values = await Promise.all([auraApi.assignments(), auraApi.events(), auraApi.kpis(from.toISOString(), to.toISOString())]);
@@ -63,14 +75,13 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
       } else next = {};
       setData(next);
     } catch (reason) {
-      setData({}); setError(reason instanceof Error ? reason.message : "No se pudo consultar el módulo.");
+      setData({}); setError(toUserMessage(reason, "No pudimos actualizar esta información."));
     } finally { setLoading(false); }
   }, [view]);
 
   useEffect(() => { void load(); setSelected([]); setProposal([]); setChoice({}); idempotency.current = null; }, [load]);
   const incidents = data.incidents?.items ?? [];
   const filteredIncidents = useMemo(() => incidents.filter((item) => `${item.entityId} ${item.machineId ?? ""} ${item.title ?? ""}`.toLowerCase().includes(search.toLowerCase())), [incidents, search]);
-  const unavailable = moduleUnavailable(error);
   const recordCount = technicianViews.has(view) ? data.myOrders?.items.length ?? 0 : view === "incidents" ? incidents.length : view === "maintenance" ? data.orders?.items.length ?? 0 : view === "technicians" ? data.technicians?.items.length ?? 0 : view === "inventory" ? data.stock?.items.length ?? 0 : data.assignments?.items.length ?? 0;
   const state = moduleLoadState({ loading, error, recordCount });
 
@@ -80,9 +91,9 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
     try {
       const response = await auraApi.optimize(selected, idempotency.current, false);
       setProposal(response.assignments); setChoice(Object.fromEntries(response.assignments.map((item) => [item.assignmentId, item.technicianId ?? ""])));
-      setNotice(response.replayed ? "Se recuperó la recomendación guardada para esta solicitud." : "Recomendación AURA calculada. Confirma una asignación para iniciar el workflow.");
+      setNotice(response.replayed ? "Se recuperó la recomendación guardada para esta solicitud." : "Recomendación AURA calculada. Confirma una asignación para iniciar el proceso.");
       idempotency.current = null; setSelected([]); await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo calcular la asignación."); }
+    } catch (reason) { setError(toUserMessage(reason, "No pudimos generar la recomendación.")); }
     finally { setOptimizing(false); }
   }
 
@@ -95,9 +106,9 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
       const selectedTechnician = choice[assignment.assignmentId] || undefined;
       const response = await auraApi.approveAssignment(assignment.assignmentId, selectedTechnician, assignment.version, key);
       approvalKeys.current.delete(assignment.assignmentId);
-      setNotice(response.workflowStarted ? "Asignación aprobada y workflow iniciado." : "Aprobación persistida. El workflow no está configurado en este entorno.");
+      setNotice(response.workflowStarted ? "Asignación aprobada y proceso iniciado." : "Aprobación guardada. El seguimiento estará disponible cuando se habilite.");
       setProposal((items) => items.filter((item) => item.assignmentId !== assignment.assignmentId)); await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo aprobar la asignación."); }
+    } catch (reason) { setError(toUserMessage(reason, "No pudimos aprobar la asignación.")); }
     finally { setApprovalBusy(null); }
   }
 
@@ -106,7 +117,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
     try {
       const response = workOrderId ? await auraApi.explainMyWorkOrder(workOrderId) : await operationsApi.explainAnomaly(anomalyId);
       setAnalysis((current) => ({ ...current, [workOrderId ?? anomalyId]: response }));
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo obtener el análisis."); }
+    } catch (reason) { setError(toUserMessage(reason, "No pudimos obtener el análisis.")); }
     finally { setAnalysisBusy(null); }
   }
 
@@ -122,7 +133,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
       setNotes((current) => ({ ...current, [order.entityId]: "" }));
       setNotice(action === "complete" ? "Trabajo enviado para revisión administrativa." : action === "block" ? "Trabajo bloqueado y observación registrada." : "Trabajo iniciado y auditado.");
       await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo actualizar el trabajo."); }
+    } catch (reason) { setError(toUserMessage(reason, "No pudimos actualizar el trabajo.")); }
     finally { setActionBusy(null); }
   }
 
@@ -132,7 +143,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
     const input = { partId: String(form.get("partId") ?? ""), locationId: String(form.get("locationId") ?? ""), quantity: Number(form.get("quantity")), reason: String(form.get("reason") ?? "") };
     setFormBusy(true); setError("");
     try { await auraApi.reserveMyPart(order.entityId, input, crypto.randomUUID()); setNotice("Reserva registrada para esta orden."); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo reservar el repuesto."); }
+    catch (reason) { setError(toUserMessage(reason, "No pudimos reservar el repuesto.")); }
     finally { setFormBusy(false); }
   }
 
@@ -140,7 +151,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
     if (actionBusy) return;
     setActionBusy(reservationId); setError("");
     try { await auraApi.consumeMyReservation(order.entityId, reservationId); setNotice("Consumo registrado en inventario y en la orden."); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo registrar el consumo."); }
+    catch (reason) { setError(toUserMessage(reason, "No pudimos registrar el consumo.")); }
     finally { setActionBusy(null); }
   }
 
@@ -150,7 +161,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
     if (!window.confirm(decision === "approve" ? "¿Aprobar el mantenimiento y cerrar el incidente vinculado?" : "¿Devolver el trabajo al técnico para continuar?") || formBusy) return;
     setFormBusy(true); setError(""); setNotice("");
     try { await auraApi.reviewWorkOrder(order.entityId, decision, review); setReviewNotes((current) => ({ ...current, [order.entityId]: "" })); setNotice(decision === "approve" ? "Mantenimiento aprobado; incidente cerrado." : "Trabajo devuelto al técnico con observaciones."); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo guardar la revisión."); }
+    catch (reason) { setError(toUserMessage(reason, "No pudimos guardar la revisión.")); }
     finally { setFormBusy(false); }
   }
 
@@ -177,7 +188,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
       setEditingTechnicianVersion(null);
       setTechForm({ technicianId: "", displayName: "", email: "", specialties: "", skills: "", capacity: "1", availability: "available", days: "1,2,3,4,5", start: "08:00", end: "17:00", timeZone: "America/Lima" });
       await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo crear el perfil técnico."); }
+    } catch (reason) { setError(toUserMessage(reason, "No pudimos guardar el perfil técnico.")); }
     finally { setFormBusy(false); }
   }
 
@@ -191,7 +202,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
     if (!window.confirm(`¿Desactivar el perfil ${technician.displayName}?`)) return;
     setActionBusy(technician.technicianId); setError("");
     try { await auraApi.archiveTechnician(technician.technicianId, technician.version); setNotice("Perfil desactivado; su asociación técnica ya no podrá acceder al panel."); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo desactivar el perfil."); }
+    catch (reason) { setError(toUserMessage(reason, "No pudimos desactivar el perfil.")); }
     finally { setActionBusy(null); }
   }
 
@@ -204,7 +215,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
       else { await auraApi.updatePart(part, editingPartVersion); setNotice("Ficha del repuesto actualizada con control de versión."); }
       setEditingPartVersion(null); setPartForm({ partId: "", name: "", sku: "", unit: "each", minimumStock: "0" }); await load();
     }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo guardar el repuesto."); }
+    catch (reason) { setError(toUserMessage(reason, "No pudimos guardar el repuesto.")); }
     finally { setFormBusy(false); }
   }
 
@@ -213,7 +224,7 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
     const input = { partId: movementForm.partId, locationId: movementForm.locationId, quantity: Number(movementForm.quantity), kind: "receipt" as const, reason: movementForm.reason };
     setFormBusy(true); setError("");
     try { await auraApi.movement(input, crypto.randomUUID()); setNotice("Ingreso de stock auditado."); setMovementForm({ partId: "", locationId: "", quantity: "", reason: "" }); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo actualizar el stock."); }
+    catch (reason) { setError(toUserMessage(reason, "No pudimos actualizar las existencias.")); }
     finally { setFormBusy(false); }
   }
 
@@ -224,26 +235,35 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
       const result = await operationsApi.createIncident({ ...incidentForm, machineId: incidentForm.machineId.trim(), type: incidentForm.type.trim(), description: incidentForm.description.trim() }, incidentKey.current);
       incidentKey.current = null; setIncidentForm({ machineId: "", type: "Mechanical", severity: "warning", description: "" });
       setNotice(result.replayed ? "Se recuperó el incidente creado para esta solicitud." : "Incidente manual creado y auditado."); await load();
-    } catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo crear el incidente."); }
+    } catch (reason) { setError(toUserMessage(reason, "No pudimos crear el incidente.")); }
     finally { setFormBusy(false); }
   }
 
   async function createOrderForIncident(incidentId: string) {
     if (actionBusy) return; setActionBusy(incidentId); setError("");
     try { const result = await operationsApi.createMaintenanceFromIncident(incidentId); setNotice(result.replayed ? "La orden existente se recuperó." : "Orden correctiva creada desde el incidente; Gemini no es requisito."); await load(); }
-    catch (reason) { setError(reason instanceof Error ? reason.message : "No se pudo crear la orden."); }
+    catch (reason) { setError(toUserMessage(reason, "No pudimos crear la orden.")); }
     finally { setActionBusy(null); }
   }
 
   return <section className="module-shell" aria-labelledby="module-title">
-    <header className="module-header"><div><span className="module-kicker"><Activity size={13}/> ARQUIFUSION / {view.toUpperCase()}</span><h2 id="module-title">{titles[view] ?? "Operaciones"}</h2><p>{isTechnician ? "Solo trabajos asignados a la cuenta técnica autenticada." : "Información de API autenticada; cada cambio queda sujeto a permisos y auditoría."}</p></div><button className="module-refresh" onClick={() => void load()} disabled={loading} aria-label="Actualizar módulo"><RefreshCw size={15}/><span>Actualizar</span></button></header>
-    {error && <div className={"module-banner " + (unavailable ? "module-banner-warn" : "module-banner-error")} role="alert"><AlertTriangle size={17}/><div><b>{unavailable ? "API de este módulo aún no disponible" : "No se pudo completar la operación"}</b><p>{unavailable ? "Operations o AURA todavía no está desplegado en el API Gateway. No se muestran datos de ejemplo." : error}</p></div><button onClick={() => void load()}>Reintentar</button></div>}
+    <header className="module-header"><div><span className="module-kicker"><Activity size={13}/> ARQUIFUSION / {view.toUpperCase()}</span><h2 id="module-title">{titles[view] ?? "Operaciones"}</h2><p>{isTechnician ? "Aquí verás solo los trabajos asignados a tu cuenta." : "Consulta la información disponible para esta organización."}</p></div><button className="module-refresh" onClick={() => void load()} disabled={loading} aria-label="Actualizar módulo"><RefreshCw size={15}/><span>Actualizar</span></button></header>
+    {error && <div className="module-banner module-banner-error" role="alert"><AlertTriangle size={17}/><div><b>{error}</b><p>Revisa la información y vuelve a intentarlo.</p></div><button onClick={() => void load()}>Volver a intentar</button></div>}
     {notice && <div className="module-result" role="status"><Check size={16}/><span>{notice}</span></div>}
     {state === "loading" ? <div className="module-skeleton" role="status" aria-label="Cargando módulo"><i/><i/><i/></div> : state !== "error" && <>
       {view === "incidents" && <>
-        {(role === "admin" || role === "owner") && <form className="module-form" onSubmit={(event) => void createIncident(event)}><h3>Registrar incidente</h3><p>Alta administrativa persistida; permite iniciar mantenimiento aunque no haya análisis de Gemini.</p><div className="module-form-grid"><Field label="ID de máquina" value={incidentForm.machineId} onChange={(value) => setIncidentForm((form) => ({ ...form, machineId: value }))} required/><Field label="Tipo" value={incidentForm.type} onChange={(value) => setIncidentForm((form) => ({ ...form, type: value }))} required/><label>Severidad<select value={incidentForm.severity} onChange={(event) => setIncidentForm((form) => ({ ...form, severity: event.target.value as "info" | "warning" | "critical" }))}><option value="info">Informativa</option><option value="warning">Advertencia</option><option value="critical">Crítica</option></select></label><Field label="Descripción" value={incidentForm.description} onChange={(value) => setIncidentForm((form) => ({ ...form, description: value }))} required/></div><button className="module-primary" disabled={formBusy}>{formBusy ? "Guardando…" : "Crear incidente"}</button></form>}
+        {(role === "admin" || role === "owner") && <form className="module-form incident-form" onSubmit={(event) => void createIncident(event)}>
+          <div><span className="module-kicker">REGISTRO ADMINISTRATIVO</span><h3>Registrar incidente</h3><p>Alta persistida. Puedes iniciar mantenimiento aunque Gemini no haya generado recomendaciones.</p></div>
+          <div className="module-form-grid">
+            <label>Máquina<select required value={incidentForm.machineId} onChange={(event) => setIncidentForm((form) => ({ ...form, machineId: event.target.value }))}><option value="">Seleccionar maquinaria registrada</option>{data.machines?.map((machine) => <option key={machine.machineId} value={machine.machineId}>{machine.machineId} · {machine.model} · {machine.location}</option>)}</select></label>
+            <Field label="Tipo de incidente" value={incidentForm.type} onChange={(value) => setIncidentForm((form) => ({ ...form, type: value }))} required/>
+            <label>Severidad<select value={incidentForm.severity} onChange={(event) => setIncidentForm((form) => ({ ...form, severity: event.target.value as "info" | "warning" | "critical" }))}><option value="info">Informativa</option><option value="warning">Advertencia</option><option value="critical">Crítica</option></select></label>
+            <TextAreaField label="Descripción y evidencia disponible" value={incidentForm.description} onChange={(event) => setIncidentForm((form) => ({ ...form, description: event.target.value }))} required rows={3}/>
+          </div>
+          <button className="module-primary" disabled={formBusy || !data.machines?.length}>{formBusy ? "Guardando…" : "Crear incidente"}</button>
+        </form>}
         <div className="module-toolbar"><label className="module-search">Buscar incidente<input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="ID, máquina o título"/></label><span>{incidents.length} registros recibidos</span><button className="module-primary" onClick={() => void optimize()} disabled={!selected.length || optimizing || role === "technician"}><Sparkles size={15}/>{optimizing ? "Calculando…" : `Generar recomendación AURA${selected.length ? ` · ${selected.length}` : ""}`}</button></div>
-        <p className="module-hint">La recomendación se calcula primero. Solo el administrador puede aprobar un candidato y arrancar el workflow.</p>
+        <p className="module-hint">La recomendación se calcula primero. Solo el administrador puede aprobar un candidato y arrancar el proceso.</p>
         <div className="module-table-wrap"><table className="module-table"><thead><tr><th>Coordinar</th><th>Incidente</th><th>Máquina</th><th>Severidad</th><th>Estado</th><th>Creado</th><th>Diagnóstico</th><th>Mantenimiento</th></tr></thead><tbody>{filteredIncidents.map((item) => {
           const anomalyId = String(item.anomalyId ?? ""); const details = anomalyId ? analysis[anomalyId] : undefined;
           return <tr key={item.entityId}><td><input type="checkbox" aria-label={`Seleccionar ${item.entityId}`} checked={selected.includes(item.entityId)} disabled={!(["open", "acknowledged"].includes(String(item.status)) && role !== "technician")} onChange={(event) => setSelected((current) => event.target.checked ? [...current, item.entityId] : current.filter((id) => id !== item.entityId))}/></td><td><b>{item.title || item.entityId}</b><small>{item.entityId}</small></td><td>{item.machineId || "—"}</td><td><Pill value={String(item.severity ?? "Sin severidad")}/></td><td><Pill value={String(item.status ?? "unknown")}/></td><td>{dateLabel(item.createdAt)}</td><td>{anomalyId ? <button className="module-link" onClick={() => void explain(anomalyId)} disabled={analysisBusy === anomalyId}>{analysisBusy === anomalyId ? "Analizando…" : details ? `Origen: ${details.source}` : "Analizar evidencia"}</button> : <span>Sin anomalía vinculada</span>}</td></tr>;
@@ -254,7 +274,27 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
       </>}
       {view === "maintenance" && <><Table items={data.orders?.items ?? []} headers={["Orden", "Máquina", "Prioridad", "Estado", "Actualizada", "Revisión"]} empty="No hay órdenes de mantenimiento." render={(item) => [<><b>{String(item.title ?? item.entityId)}</b><small>{item.entityId}</small></>, String(item.machineId ?? "—"), String(item.priority ?? "—"), <Pill value={String(item.status ?? "unknown")}/>, dateLabel(item.updatedAt), item.status === "completed" ? <div className="review-actions"><input aria-label={`Observación de revisión ${item.entityId}`} value={reviewNotes[item.entityId] ?? ""} onChange={(event) => setReviewNotes((current) => ({ ...current, [item.entityId]: event.target.value }))} placeholder="Observación"/><button onClick={() => void review(item, "approve")} disabled={formBusy}>Aprobar</button><button onClick={() => void review(item, "return")} disabled={formBusy}>Devolver</button></div> : "—"]}/></>}
       {view === "technicians" && <>
-        {role === "admin" || role === "owner" ? <form className="module-form" onSubmit={(event) => void createTechnician(event)}><h3>{editingTechnicianVersion === null ? "Invitar técnico por correo" : "Editar perfil técnico"}</h3><p>{editingTechnicianVersion === null ? "Cognito enviará su invitación. La identidad se vincula con el sub devuelto por Cognito; no introduzcas una contraseña." : "Actualización protegida por If-Match. No cambia la identidad vinculada."}</p><div className="module-form-grid"><Field label="ID técnico" value={techForm.technicianId} onChange={(value) => setTechForm((form) => ({ ...form, technicianId: value }))} required/><Field label="Nombre visible" value={techForm.displayName} onChange={(value) => setTechForm((form) => ({ ...form, displayName: value }))} required/>{editingTechnicianVersion === null && <Field label="Correo de invitación" type="email" value={techForm.email} onChange={(value) => setTechForm((form) => ({ ...form, email: value }))} required/>}<Field label="Especialidades separadas por coma" value={techForm.specialties} onChange={(value) => setTechForm((form) => ({ ...form, specialties: value }))} required/><Field label="Habilidades codigo:nivel separadas por coma" value={techForm.skills} onChange={(value) => setTechForm((form) => ({ ...form, skills: value }))} required/><Field label="Capacidad simultánea" type="number" value={techForm.capacity} onChange={(value) => setTechForm((form) => ({ ...form, capacity: value }))} required/><Field label="Días 0–6" value={techForm.days} onChange={(value) => setTechForm((form) => ({ ...form, days: value }))} required/><Field label="Inicio local" type="time" value={techForm.start} onChange={(value) => setTechForm((form) => ({ ...form, start: value }))} required/><Field label="Fin local" type="time" value={techForm.end} onChange={(value) => setTechForm((form) => ({ ...form, end: value }))} required/><Field label="Zona horaria" value={techForm.timeZone} onChange={(value) => setTechForm((form) => ({ ...form, timeZone: value }))} required/><label>Disponibilidad<select value={techForm.availability} onChange={(event) => setTechForm((form) => ({ ...form, availability: event.target.value }))}><option value="available">Disponible</option><option value="unavailable">No disponible</option></select></label></div><button className="module-primary" disabled={formBusy}>{formBusy ? "Guardando…" : editingTechnicianVersion === null ? "Invitar y crear perfil" : "Guardar cambios"}</button>{editingTechnicianVersion !== null && <button type="button" onClick={() => { setEditingTechnicianVersion(null); setTechForm({ technicianId: "", displayName: "", email: "", specialties: "", skills: "", capacity: "1", availability: "available", days: "1,2,3,4,5", start: "08:00", end: "17:00", timeZone: "America/Lima" }); }}>Cancelar edición</button>}</form> : <Empty text="La gestión de perfiles está reservada a administradores de la organización."/>}
+        {role === "admin" || role === "owner" ? <form className="module-form technician-form" onSubmit={(event) => void createTechnician(event)}>
+          <div className="technician-form-heading"><div><span className="module-kicker">CUENTAS Y CAPACIDADES</span><h3>{editingTechnicianVersion === null ? "Invitar técnico por correo" : "Editar perfil técnico"}</h3><p>{editingTechnicianVersion === null ? "Cognito enviará su invitación. La identidad se vincula con el sub devuelto por Cognito; no introduzcas una contraseña." : "Actualización protegida por If-Match. No cambia la identidad vinculada."}</p></div></div>
+          <FormSection title="Identidad" description="Datos de perfil para asociar la cuenta invitada al técnico.">
+            <Field label="ID técnico" value={techForm.technicianId} onChange={(value) => setTechForm((form) => ({ ...form, technicianId: value }))} required/>
+            <Field label="Nombre visible" value={techForm.displayName} onChange={(value) => setTechForm((form) => ({ ...form, displayName: value }))} required/>
+            {editingTechnicianVersion === null && <Field label="Correo de invitación" type="email" value={techForm.email} onChange={(value) => setTechForm((form) => ({ ...form, email: value }))} required/>}
+          </FormSection>
+          <FormSection title="Especialidades y habilidades" description="Usa códigos compatibles con las reglas de asignación AURA.">
+            <Field label="Especialidades separadas por coma" value={techForm.specialties} onChange={(value) => setTechForm((form) => ({ ...form, specialties: value }))} required/>
+            <Field label="Habilidades código:nivel separadas por coma" value={techForm.skills} onChange={(value) => setTechForm((form) => ({ ...form, skills: value }))} required/>
+            <Field label="Capacidad simultánea" type="number" value={techForm.capacity} onChange={(value) => setTechForm((form) => ({ ...form, capacity: value }))} required/>
+          </FormSection>
+          <FormSection title="Disponibilidad y turno">
+            <label className="module-form-label">Disponibilidad<select value={techForm.availability} onChange={(event) => setTechForm((form) => ({ ...form, availability: event.target.value }))}><option value="available">Disponible</option><option value="unavailable">No disponible</option></select></label>
+            <Field label="Días 0–6" value={techForm.days} onChange={(value) => setTechForm((form) => ({ ...form, days: value }))} required/>
+            <Field label="Inicio local" type="time" value={techForm.start} onChange={(value) => setTechForm((form) => ({ ...form, start: value }))} required/>
+            <Field label="Fin local" type="time" value={techForm.end} onChange={(value) => setTechForm((form) => ({ ...form, end: value }))} required/>
+            <Field label="Zona horaria" value={techForm.timeZone} onChange={(value) => setTechForm((form) => ({ ...form, timeZone: value }))} required/>
+          </FormSection>
+          <div className="technician-form-actions"><button className="module-primary" disabled={formBusy}>{formBusy ? "Guardando…" : editingTechnicianVersion === null ? "Invitar y crear perfil" : "Guardar cambios"}</button>{editingTechnicianVersion !== null && <button type="button" className="module-refresh" onClick={() => { setEditingTechnicianVersion(null); setTechForm({ technicianId: "", displayName: "", email: "", specialties: "", skills: "", capacity: "1", availability: "available", days: "1,2,3,4,5", start: "08:00", end: "17:00", timeZone: "America/Lima" }); }}>Cancelar edición</button>}</div>
+        </form> : <Empty text="La gestión de perfiles está reservada a administradores de la organización."/>}
         <div className="module-metrics"><Metric label="Técnicos" value={String(data.technicians?.items.length ?? 0)}/><Metric label="Disponibles" value={String(data.technicians?.items.filter((item) => item.availability === "available").length ?? 0)}/><Metric label="Habilidades" value={String(new Set(data.technicians?.items.flatMap((item) => item.skills.map((skill) => skill.code)) ?? []).size)}/></div><Table items={(data.technicians?.items ?? []) as unknown as OperationalItem[]} headers={["Técnico", "Disponibilidad", "Especialidades", "Habilidades", "Capacidad", "Acción"]} empty="No hay perfiles técnicos registrados." render={(item) => { const tech = item as unknown as AuraTechnician; return [<><b>{tech.displayName}</b><small>{tech.technicianId}</small></>, <Pill value={tech.availability}/>, tech.specialties.join(" · "), tech.skills.map((skill) => `${skill.code} L${skill.level}`).join(" · "), String(tech.maxConcurrentAssignments), role === "admin" || role === "owner" ? <div className="module-action-row"><button onClick={() => editTechnician(tech)}>Editar</button>{tech.status !== "inactive" && <button onClick={() => void archiveTechnician(tech)} disabled={actionBusy === tech.technicianId}>Desactivar</button>}</div> : "—"]; }}/>
       </>}
       {view === "inventory" && <>
@@ -263,8 +303,10 @@ export function OperationalModule({ view, onNavigate, role }: { view: AppView; o
         <Table items={(data.parts?.items ?? []) as unknown as OperationalItem[]} headers={["Catálogo", "SKU", "Unidad", "Stock mínimo", "Acción"]} empty="No hay repuestos en el catálogo." render={(item) => { const part = item as unknown as InventoryPart; return [<><b>{part.name}</b><small>{part.partId}</small></>, part.sku, part.unit, String(part.minimumStock), role === "admin" || role === "owner" ? <button onClick={() => { setEditingPartVersion(part.version); setPartForm({ partId: part.partId, name: part.name, sku: part.sku, unit: part.unit, minimumStock: String(part.minimumStock) }); }}>Editar</button> : "—"]; }}/>
         {!!data.alerts?.items.length && <div className="inventory-alerts">{data.alerts.items.map((item, index) => <article key={String(item.partId) + index}><AlertTriangle size={15}/><b>{String(item.name ?? item.partId)}</b><span>{String(item.locationId)} · disponible {String(item.available)} / mínimo {String(item.minimumStock)}</span></article>)}</div>}
         <Table items={(data.stock?.items ?? []) as unknown as OperationalItem[]} headers={["Repuesto", "SKU", "Ubicación", "En mano", "Reservado", "Disponible"]} empty="No hay saldos de inventario." render={(item) => { const part = data.parts?.items.find((row) => row.partId === item.partId); return [<><b>{part?.name ?? String(item.partId)}</b><small>{String(item.partId)}</small></>, part?.sku ?? "—", String(item.locationId), String(item.onHand), String(item.reserved), String(Number(item.onHand) - Number(item.reserved))]; }}/>
+        <div className="module-subheading"><h3>Movimientos de inventario</h3><span>Últimos registros persistidos</span></div>
+        <Table items={(data.movements?.items ?? []) as unknown as OperationalItem[]} headers={["Fecha", "Repuesto", "Ubicación", "Tipo", "Cantidad", "Motivo"]} empty="No hay movimientos de inventario." render={(item) => { const movement = item as unknown as InventoryMovement; const part = data.parts?.items.find((row) => row.partId === movement.partId); return [dateLabel(movement.createdAt), <><b>{part?.name ?? movement.partId}</b><small>{movement.partId}</small></>, movement.locationId, movement.kind === "receipt" ? "Ingreso" : movement.kind, String(movement.quantity), movement.reason]; }}/>
       </>}
-      {view === "orchestration" && <><div className="module-metrics"><Metric label="MTTR · periodo consultado" value={data.kpis?.mttr.averageMinutes == null ? "—" : `${Math.round(data.kpis.mttr.averageMinutes)} min`}/><Metric label="Reincidencia · 30 días" value={data.kpis?.recurrence.percent == null ? "—" : `${data.kpis.recurrence.percent}%`}/><Metric label="Downtime" value={data.kpis?.downtime.totalMinutes == null ? "No disponible" : `${Math.round(data.kpis.downtime.totalMinutes)} min`}/></div><div className="workflow-summary"><div><span>ASIGNACIONES</span><b>{data.assignments?.items.length ?? 0}</b></div><div><span>EN ATENCIÓN</span><b>{data.assignments?.items.filter((item) => item.status === "in_progress").length ?? 0}</b></div><div><span>EVENTOS AURA</span><b>{data.events?.items.length ?? 0}</b></div></div><div className="workflow-list">{data.assignments?.items.map((assignment) => <WorkflowCard key={assignment.assignmentId} assignment={assignment} onOpenIncidents={() => onNavigate("incidents")}/>)}{!data.assignments?.items.length && <Empty text="No hay workflows de asignación."/>}</div><div className="module-subheading"><h3>Eventos persistidos</h3><span>Un evento registrado no acredita entrega de notificación.</span></div><Timeline items={data.events?.items ?? []}/></>}
+      {view === "orchestration" && <><div className="module-metrics"><Metric label="MTTR · periodo consultado" title="Tiempo medio para resolver una incidencia" value={data.kpis?.mttr.averageMinutes == null ? "—" : `${Math.round(data.kpis.mttr.averageMinutes)} min`}/><Metric label="Reincidencia · 30 días" value={data.kpis?.recurrence.percent == null ? "—" : `${data.kpis.recurrence.percent}%`}/><Metric label="Tiempo detenido" value={data.kpis?.downtime.totalMinutes == null ? "No disponible" : `${Math.round(data.kpis.downtime.totalMinutes)} min`}/></div><div className="workflow-summary"><div><span>ASIGNACIONES</span><b>{data.assignments?.items.length ?? 0}</b></div><div><span>EN ATENCIÓN</span><b>{data.assignments?.items.filter((item) => item.status === "in_progress").length ?? 0}</b></div><div><span>EVENTOS AURA</span><b>{data.events?.items.length ?? 0}</b></div></div><div className="workflow-list">{data.assignments?.items.map((assignment) => <WorkflowCard key={assignment.assignmentId} assignment={assignment} onOpenIncidents={() => onNavigate("incidents")}/>)}{!data.assignments?.items.length && <Empty text="No hay procesos de asignación."/>}</div><div className="module-subheading"><h3>Actividad registrada</h3><span>El registro de un evento no confirma la entrega de avisos externos.</span></div><Timeline items={data.events?.items ?? []}/></>}
       {technicianViews.has(view) && <TechnicianContent view={view} data={data} notes={notes} setNotes={setNotes} actionBusy={actionBusy} analysis={analysis} analysisBusy={analysisBusy} formBusy={formBusy} onAction={technicianAction} onExplain={(order) => void explain("", order.entityId)} onReserve={(event, order) => void reservePart(event, order)} onConsume={(order, id) => void consumeReservation(order, id)}/>}
     </>}
   </section>;
@@ -289,12 +331,11 @@ function OrderCards({ orders, notes, setNotes, actionBusy, analysis, analysisBus
       {(order.partsUsed?.length ?? 0) > 0 && <small>Consumidos: {order.partsUsed?.map((part) => `${part.partId} × ${part.quantity}`).join(" · ")}</small>}</article>)}{!orders.length || partsOnly && !orders.some((order) => order.reservations?.length || order.partsUsed?.length) ? <Empty text={partsOnly ? "No hay repuestos solicitados o consumidos en tus trabajos." : "No tienes trabajos asignados."}/> : null}</div>;
 }
 
-function Table({ items, headers, empty, render }: { items: OperationalItem[]; headers: string[]; empty: string; render: (item: OperationalItem) => ReactNode[] }) { return <div className="module-table-wrap"><table className="module-table"><thead><tr>{headers.map((header) => <th key={header}>{header}</th>)}</tr></thead><tbody>{items.map((item) => <tr key={item.entityId}>{render(item).map((value, index) => <td key={index}>{value}</td>)}</tr>)}</tbody></table>{!items.length && <Empty text={empty}/>}</div>; }
 function Field({ label, value, onChange, name, type = "text", required = false, disabled = false }: { label: string; value?: string; onChange?: (value: string) => void; name?: string; type?: string; required?: boolean; disabled?: boolean }) { return <label>{label}<input name={name} type={type} value={value} onChange={onChange ? (event) => onChange(event.target.value) : undefined} required={required} disabled={disabled} min={type === "number" ? "0" : undefined}/></label>; }
-function Metric({ label, value, tone = "" }: { label: string; value: string; tone?: string }) { return <article className={`module-metric ${tone}`}><span>{label}</span><b>{value}</b></article>; }
+function Metric({ label, value, tone = "", title }: { label: string; value: string; tone?: string; title?: string }) { return <article className={`module-metric ${tone}`}><span title={title}>{label}</span><b>{value}</b></article>; }
 function Empty({ text }: { text: string }) { return <div className="module-empty"><Circle size={18}/><p>{text}</p></div>; }
 function Pill({ value }: { value: string }) { const labels: Record<string, string> = { open: "Abierto", analyzing: "Analizando", pending_assignment: "Pendiente de asignación", acknowledged: "Atendido", assigned: "Asignado", in_progress: "En progreso", resolved: "Resuelto", closed: "Cerrado", planned: "Planificado", blocked: "Bloqueado", completed: "Pendiente de aprobación", approved: "Aprobado", cancelled: "Cancelado", proposed: "Propuesto", accepted: "Aceptado", escalated: "Escalado", unassigned: "Sin asignar", available: "Disponible", unavailable: "No disponible" }; return <span className={`module-pill ${value}`}>{labels[value] ?? value}</span>; }
-function AnalysisCard({ analysis, title }: { analysis: Analysis; title: string }) { return <article className="module-analysis"><h3><Sparkles size={15}/>{title}</h3><p>Proveedor reportado: <b>{analysis.source}</b>{analysis.source === "gemini-api" ? " · respuesta del proveedor IA" : " · reglas deterministas / evidencia disponible"}</p>{analysis.recommendations.map((item, index) => <div key={index}><b>{item.title}</b><p>{item.reason}</p><small>{item.suggestedAction}</small></div>)}{!analysis.recommendations.length && <p>No hay recomendaciones adicionales; revisa la evidencia y el diagnóstico registrado.</p>}{analysis.evidence && <details><summary>Evidencia</summary><pre>{JSON.stringify(analysis.evidence, null, 2)}</pre></details>}</article>; }
+function AnalysisCard({ analysis, title }: { analysis: Analysis; title: string }) { return <article className="module-analysis"><h3><Sparkles size={15}/>{title}</h3><p>Análisis generado con <b>{analysis.source === "gemini-api" ? "Gemini" : "reglas del sistema"}</b>.</p>{analysis.recommendations.map((item, index) => <div key={index}><b>{item.title}</b><p>{item.reason}</p><small>{item.suggestedAction}</small></div>)}{!analysis.recommendations.length && <p>No hay recomendaciones adicionales; revisa el diagnóstico registrado.</p>}{analysis.evidence && <small>Evidencia asociada al análisis.</small>}</article>; }
 function dateLabel(value?: string) { return value && Number.isFinite(Date.parse(value)) ? new Date(value).toLocaleString("es-PE", { dateStyle: "medium", timeStyle: "short" }) : "—"; }
-function WorkflowCard({ assignment, onOpenIncidents }: { assignment: AuraAssignment; onOpenIncidents: () => void }) { const steps = ["proposed", "accepted", "in_progress", "completed_pending_approval", "closed"], current = steps.indexOf(assignment.status), failed = ["escalated", "unassigned"].includes(assignment.status); return <article className="workflow-card"><div className="workflow-card-head"><div><span className="module-kicker">INCIDENTE {assignment.incidentId}</span><h3>{assignment.machineId}</h3></div><Pill value={assignment.status}/></div><div className="workflow-steps" aria-label={`Estado del workflow: ${assignment.status}`}>{["Propuesta", "Confirmación", "Intervención", "Revisión", "Cierre"].map((label, index) => <div key={label} className={index < current ? "step-done" : index === current ? "step-active" : ""}><span>{index < current ? <Check size={12}/> : index + 1}</span><small>{label}</small></div>)}</div><div className="workflow-card-foot"><span>Técnico: {assignment.technicianId ?? "Sin asignar"}</span><span>Costo {Number(assignment.cost).toFixed(3)}{assignment.distanceKm === undefined ? " · distancia omitida" : ` · ${assignment.distanceKm.toFixed(1)} km`}</span>{failed && <button onClick={onOpenIncidents}>Revisar incidente <ArrowRight size={13}/></button>}</div><div className="assignment-cost-factors">{Object.entries(assignment.costBreakdown ?? {}).map(([factor, value]) => <span key={factor}>{factor}: {Number(value).toFixed(2)}</span>)}</div></article>; }
-function Timeline({ items }: { items: OperationalItem[] }) { return <div className="module-timeline">{items.map((item) => <article key={item.entityId}><span className="timeline-mark"><Clock3 size={12}/></span><div><b>{String(item.eventType ?? item.entityId)}</b><p>{String(item.resourceId ?? item.machineId ?? "Evento operativo")}</p><small>{dateLabel(String(item.timestamp ?? item.createdAt))}</small></div><span className="timeline-status">Persistido</span></article>)}{!items.length && <Empty text="No hay eventos AURA registrados."/>}</div>; }
+function WorkflowCard({ assignment, onOpenIncidents }: { assignment: AuraAssignment; onOpenIncidents: () => void }) { const steps = ["proposed", "accepted", "in_progress", "completed_pending_approval", "closed"], current = steps.indexOf(assignment.status), failed = ["escalated", "unassigned"].includes(assignment.status); return <article className="workflow-card"><div className="workflow-card-head"><div><span className="module-kicker">INCIDENTE {assignment.incidentId}</span><h3>{assignment.machineId}</h3></div><Pill value={assignment.status}/></div><div className="workflow-steps" aria-label={`Estado del proceso: ${assignment.status}`}>{["Propuesta", "Confirmación", "Intervención", "Revisión", "Cierre"].map((label, index) => <div key={label} className={index < current ? "step-done" : index === current ? "step-active" : ""}><span>{index < current ? <Check size={12}/> : index + 1}</span><small>{label}</small></div>)}</div><div className="workflow-card-foot"><span>Técnico: {assignment.technicianId ?? "Sin asignar"}</span><span>Costo {Number(assignment.cost).toFixed(3)}{assignment.distanceKm === undefined ? " · distancia omitida" : ` · ${assignment.distanceKm.toFixed(1)} km`}</span>{failed && <button onClick={onOpenIncidents}>Revisar incidente <ArrowRight size={13}/></button>}</div><div className="assignment-cost-factors">{Object.entries(assignment.costBreakdown ?? {}).map(([factor, value]) => <span key={factor}>{factor}: {Number(value).toFixed(2)}</span>)}</div></article>; }
+function Timeline({ items }: { items: OperationalItem[] }) { return <div className="module-timeline">{items.map((item) => <article key={item.entityId}><span className="timeline-mark"><Clock3 size={12}/></span><div><b>{toEventLabel(String(item.eventType ?? item.entityId))}</b><p>{String(item.resourceId ?? item.machineId ?? "Evento operativo")}</p><small>{dateLabel(String(item.timestamp ?? item.createdAt))}</small></div><span className="timeline-status">Registrado</span></article>)}{!items.length && <Empty text="No hay eventos AURA registrados."/>}</div>; }
